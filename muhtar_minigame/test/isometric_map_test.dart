@@ -121,24 +121,7 @@ void main() {
         Locations.ruins.tiles.first.take(12).every((tile) => tile == 9),
         isTrue,
       );
-      expect(Locations.ruins.tiles.first.skip(12).take(16), [
-        7,
-        7,
-        7,
-        7,
-        4,
-        7,
-        7,
-        7,
-        7,
-        7,
-        7,
-        7,
-        7,
-        7,
-        7,
-        7,
-      ]);
+      expect(Locations.ruins.tiles.first.skip(12).take(16), everyElement(7));
       expect(
         Locations.ruins.tiles.first.skip(28).every((tile) => tile == 9),
         isTrue,
@@ -161,14 +144,9 @@ void main() {
       }
       for (var row = 0; row < Locations.ruins.rows; row++) {
         for (var col = 12; col <= 27; col++) {
-          final isCenterExit = col == 16 && (row == 0 || row == 7);
           expect(
             Locations.ruins.tileAt(col, row),
-            isCenterExit
-                ? 4
-                : row == 0 || row == 7
-                ? 7
-                : 0,
+            row == 0 || row == 7 ? 7 : 0,
           );
         }
       }
@@ -204,20 +182,23 @@ void main() {
       expect(Locations.ruins.inBounds(40, 3), isFalse);
       expect(Locations.ruins.tileAt(0, 3), 4);
       expect(Locations.ruins.exitAt(0, 3)?.targetId, 'forest');
-      expect(Locations.ruins.exitAt(39, 1)?.targetId, 'horse');
-      expect(Locations.ruins.exitAt(39, 2)?.targetId, 'college');
-      expect(Locations.ruins.exitAt(39, 5)?.targetId, 'dormitory');
-      expect(Locations.ruins.exitAt(16, 0)?.targetId, 'cheburechnaya');
-      expect(Locations.ruins.exitAt(16, 7)?.targetId, 'wb');
+      expect(Locations.ruins.exitAt(39, 2)?.targetId, 'horse');
       expect(Locations.ruins.exitAt(28, 5)?.targetId, 'kopeechka');
       expect(Locations.ruins.exitAt(28, 6)?.targetId, 'cheburechnaya');
       expect(Locations.ruins.exitAt(28, 5)?.direction, ExitDirection.right);
       expect(Locations.ruins.exitAt(28, 6)?.direction, ExitDirection.right);
-      expect(Locations.horse.exits.single.targetId, 'ruins');
+      expect(
+        Locations.horse.exits.map((exit) => exit.targetId),
+        containsAll(<String>['ruins', 'doner', 'college', 'dormitory', 'wb']),
+      );
       expect(Locations.horse.cols, 16);
       expect(Locations.horse.rows, 8);
       expect(Locations.horse.outsideTile, 9);
       expect(Locations.horse.tileAt(0, 4), 4);
+      expect(Locations.horse.tileAt(5, 0), 4);
+      expect(Locations.horse.tileAt(15, 2), 4);
+      expect(Locations.horse.tileAt(15, 5), 4);
+      expect(Locations.horse.tileAt(10, 7), 4);
       expect(
         Locations.horse.tiles.expand((row) => row),
         everyElement(isNot(6)),
@@ -242,7 +223,8 @@ void main() {
 
     test('shop interiors return to the Bridge', () {
       expect(Locations.kopeechka.name, 'Копеечка');
-      expect(Locations.cheburechnaya.name, 'Донер (шаурмечная)');
+      expect(Locations.cheburechnaya.name, 'Чебуречная');
+      expect(Locations.doner.name, 'Донер (шаурмечная)');
       expect(Locations.kopeechka.exits.single.targetId, 'ruins');
       expect(Locations.cheburechnaya.exits.single.targetId, 'ruins');
     });

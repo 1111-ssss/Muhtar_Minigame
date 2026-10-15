@@ -86,7 +86,8 @@ void main() {
 
   test('новые NPC, квест и товары заведены в контенте', () {
     expect(Locations.cheburechnaya.npcs.single.id, 'baba_galya');
-    expect(Locations.cheburechnaya.name, 'Донер (шаурмечная)');
+    expect(Locations.cheburechnaya.name, 'Чебуречная');
+    expect(Locations.doner.name, 'Донер (шаурмечная)');
     expect(Locations.college.name, 'Колледж');
     expect(Locations.dormitory.name, 'Общага');
     expect(Locations.wb.name, 'ВБ');

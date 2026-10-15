@@ -11,6 +11,7 @@ void main() {
     'forest',
     'ruins',
     'horse',
+    'doner',
     'kopeechka',
     'cheburechnaya',
   ];
