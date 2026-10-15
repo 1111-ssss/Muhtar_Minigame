@@ -1,0 +1,979 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
+
+import '../domain/dice.dart';
+import '../domain/artifact.dart';
+import '../domain/game_content.dart';
+import '../domain/location.dart';
+import '../domain/locations.dart';
+import '../domain/player_skin.dart';
+import '../domain/quest.dart';
+import '../domain/shop_item.dart';
+
+/// Состояние игрока и прогресс. Знает про Flutter только через ChangeNotifier.
+class GameState extends ChangeNotifier {
+  /// Старый лимит API сохранён для миграции; реальные кейсы не ограничивают
+  /// размер инвентаря.
+  static const int maxDiceCount = 6;
+
+  /// Максимальный размер хотбара, который можно купить у Арианы.
+  static const int maxDicePerTurn = 3;
+  static const int maxRerollsPerRound = 6;
+  static const int caseCost = 30;
+  static const Duration enemyRespawnDelay = Duration(minutes: 5);
+
+  GameState({Random? random}) : _random = random ?? Random() {
+    _resetValues();
+  }
+
+  int _coins = 50;
+  int _xp = 0;
+  int _level = 1;
+  int _playerHp = 30;
+  int _bonusMaxHp = 0;
+  int _dicePerTurn = 1;
+  int _rerollsPerRound = 1;
+  String _currentLocationId = 'meadow';
+  List<Dice> _dice = [];
+  Map<String, QuestProgress> _quests = {};
+  Set<String> _defeatedEnemyKeys = {};
+  Map<String, DateTime> _enemyRespawnAt = {};
+  final Map<CaseType, int> _cases = {};
+  final Map<Artifact, int> _artifacts = {};
+  final Map<String, int> _items = {};
+  final Set<String> _purchasedShopItems = {};
+  List<Artifact> _pendingArtifactChoices = [];
+  final Random _random;
+  final Set<String> _ownedSkinIds = {};
+  String _selectedSkinId = PlayerSkin.defaultSkin.id;
+  final Map<String, int> _searchTaps = {};
+  final Map<String, SearchResult> _searchResults = {};
+
+  int caseCount(CaseType type) => _cases[type] ?? 0;
+  void addArtifactCases(int count) {
+    if (count <= 0) return;
+    _cases[CaseType.artifact] = caseCount(CaseType.artifact) + count;
+    notifyListeners();
+  }
+
+  Map<Artifact, int> get artifacts => Map.unmodifiable(_artifacts);
+  List<Artifact> get pendingArtifactChoices =>
+      List.unmodifiable(_pendingArtifactChoices);
+
+  int get coins => _coins;
+  int get xp => _xp;
+  int get level => _level;
+  String get playerName => GameContent.playerNameForLevel(_level);
+  int get playerMaxHp => 30 + (_level - 1) * 10 + _bonusMaxHp;
+  int get playerHp => _playerHp.clamp(0, playerMaxHp).toInt();
+  int get dicePerTurn => _dicePerTurn.clamp(1, maxDicePerTurn).toInt();
+  int get rerollsPerRound =>
+      _rerollsPerRound.clamp(1, maxRerollsPerRound).toInt();
+  List<Dice> get dice => List.unmodifiable(_dice);
+  List<Dice> get inventory => List.unmodifiable(_dice);
+  int get diceCount => _dice.length;
+  int get inventoryCount => _dice.length;
+  int get bonusMaxHp => _bonusMaxHp;
+  Map<String, int> get items => Map.unmodifiable(_items);
+  int itemCount(String itemId) => _items[itemId] ?? 0;
+  bool hasItem(String itemId) => itemCount(itemId) > 0;
+  bool hasPurchasedShopItem(String itemId) =>
+      _purchasedShopItems.contains(itemId);
+
+  List<PlayerSkin> get ownedSkins => [
+    for (final skin in GameContent.skinCatalog)
+      if (_ownedSkinIds.contains(skin.id)) skin,
+  ];
+
+  /// Каталог, отфильтрованный по уже открытым образам. Инвентарь использует
+  /// именно этот список, чтобы закрытые скины вообще не занимали место в UI.
+  List<PlayerSkin> get availableSkins => List.unmodifiable(ownedSkins);
+
+  Set<String> get ownedSkinIds => Set.unmodifiable(_ownedSkinIds);
+
+  String get selectedSkinId => _selectedSkinId;
+
+  PlayerSkin get selectedSkin =>
+      GameContent.skinById(_selectedSkinId) ?? PlayerSkin.defaultSkin;
+
+  PlayerSkin get selectedPlayerSkin => selectedSkin;
+
+  bool hasSkin(String skinId) {
+    final skin = GameContent.skinById(skinId);
+    return skin != null && _ownedSkinIds.contains(skin.id);
+  }
+
+  bool unlockSkin(String skinId) {
+    final skin = GameContent.skinById(skinId);
+    if (skin == null || !_ownedSkinIds.add(skin.id)) return false;
+    notifyListeners();
+    return true;
+  }
+
+  bool selectSkin(String skinId) {
+    final skin = GameContent.skinById(skinId);
+    if (skin == null || !hasSkin(skin.id)) return false;
+    if (_selectedSkinId == skin.id) return true;
+    _selectedSkinId = skin.id;
+    notifyListeners();
+    return true;
+  }
+
+  int searchTapCount(String propId) => _searchTaps[propId] ?? 0;
+
+  SearchResult? searchResult(String propId) => _searchResults[propId];
+
+  /// Цена следующего места в хотбаре.
+  int get diceUpgradeCost => 35 + (dicePerTurn - 1) * 25;
+  int get rerollUpgradeCost => 25 + (rerollsPerRound - 1) * 20;
+
+  Map<String, QuestProgress> get quests => Map.unmodifiable(_quests);
+
+  bool isEnemyDefeated(String spawnKey) {
+    final remaining = enemyRespawnRemaining(spawnKey);
+    return remaining != null;
+  }
+
+  Duration? enemyRespawnRemaining(String spawnKey) {
+    final respawnAt = _enemyRespawnAt[spawnKey];
+    if (respawnAt == null) return null;
+    final remaining = respawnAt.difference(DateTime.now());
+    if (remaining <= Duration.zero) {
+      _enemyRespawnAt.remove(spawnKey);
+      _defeatedEnemyKeys.remove(spawnKey);
+      return null;
+    }
+    return remaining;
+  }
+
+  /// id текущей локации игрока.
+  String get currentLocationId => _currentLocationId;
+  set currentLocationId(String value) {
+    _currentLocationId = value;
+    notifyListeners();
+  }
+
+  /// Опыт, нужный для следующего уровня.
+  int get xpToNext => 100 * _level;
+
+  List<QuestProgress> get activeQuests =>
+      _quests.values.where((q) => q.state == QuestState.active).toList();
+
+  List<QuestProgress> get completedQuests =>
+      _quests.values.where((q) => q.state == QuestState.completed).toList();
+
+  // --- Монеты ---
+
+  void addCoins(int amount) {
+    if (amount == 0) return;
+    _coins += amount;
+    notifyListeners();
+  }
+
+  bool spendCoins(int amount) {
+    if (amount < 0 || _coins < amount) return false;
+    _coins -= amount;
+    notifyListeners();
+    return true;
+  }
+
+  // --- Опыт и уровни ---
+
+  void addXp(int amount) {
+    _addXpSilently(amount);
+    notifyListeners();
+  }
+
+  void _addXpSilently(int amount) {
+    _xp += amount;
+    while (_xp >= xpToNext) {
+      _xp -= xpToNext;
+      _level++;
+    }
+  }
+
+  /// HP героя живёт между отдельными сражениями.
+  void setPlayerHp(int value) {
+    _playerHp = value.clamp(0, playerMaxHp).toInt();
+    notifyListeners();
+  }
+
+  /// Небольшое восстановление после победы: 10% максимального HP врага.
+  int healAfterVictory(int defeatedMaxHp) {
+    final amount = max(1, (defeatedMaxHp * .1).round());
+    setPlayerHp(_playerHp + amount);
+    return amount;
+  }
+
+  void loseCoins(int amount) {
+    if (amount <= 0) return;
+    _coins = (_coins - amount).clamp(0, 1 << 31).toInt();
+    notifyListeners();
+  }
+
+  // --- Инвентарь и Шоп Арианы ---
+
+  @Deprecated('Используйте buyCase')
+  bool addDiceType(String diceId) {
+    if (diceCount >= maxDiceCount) return false;
+    final template = GameContent.diceById(diceId);
+    if (template == null || !spendCoins(caseCost)) return false;
+    _dice.add(template);
+    notifyListeners();
+    return true;
+  }
+
+  int diceTypeCount(String diceId) =>
+      _dice.where((dice) => dice.id == diceId).length;
+
+  /// Покупка не открывает кейс. Он попадает в стопку в инвентаре.
+  bool buyCase() {
+    if (_coins < caseCost) return false;
+    _coins -= caseCost;
+    _cases[CaseType.dice] = caseCount(CaseType.dice) + 1;
+    notifyListeners();
+    return true;
+  }
+
+  /// Награда фиксируется до анимации: закрытие окна не теряет кость и не
+  /// позволяет перебросить результат открытия.
+  Dice? openDiceCase() {
+    if (caseCount(CaseType.dice) == 0) return null;
+    _cases[CaseType.dice] = caseCount(CaseType.dice) - 1;
+    final template = GameContent
+        .diceCatalog[_random.nextInt(GameContent.diceCatalog.length)];
+    final result = template.copyWith(level: _random.nextInt(Dice.maxLevel) + 1);
+    _dice.add(result);
+    notifyListeners();
+    return result;
+  }
+
+  List<Artifact> openArtifactCase() {
+    if (_pendingArtifactChoices.isNotEmpty) return pendingArtifactChoices;
+    if (caseCount(CaseType.artifact) == 0) return const [];
+    _cases[CaseType.artifact] = caseCount(CaseType.artifact) - 1;
+    final pool = Artifact.values.toList()..shuffle(_random);
+    _pendingArtifactChoices = pool.take(3).toList();
+    notifyListeners();
+    return pendingArtifactChoices;
+  }
+
+  bool chooseArtifact(Artifact artifact) {
+    if (!_pendingArtifactChoices.contains(artifact)) return false;
+    _artifacts[artifact] = (_artifacts[artifact] ?? 0) + 1;
+    _pendingArtifactChoices = [];
+    notifyListeners();
+    return true;
+  }
+
+  /// Увеличивает количество свободных мест в хотбаре.
+  bool upgradeDicePerTurn() {
+    if (_dicePerTurn >= maxDicePerTurn) return false;
+    final cost = diceUpgradeCost;
+    if (!spendCoins(cost)) return false;
+    _dicePerTurn++;
+    notifyListeners();
+    return true;
+  }
+
+  int get dicePerTurnUpgradeCost => diceUpgradeCost;
+
+  bool upgradeRerolls() {
+    if (_rerollsPerRound >= maxRerollsPerRound) return false;
+    if (!spendCoins(rerollUpgradeCost)) return false;
+    _rerollsPerRound++;
+    notifyListeners();
+    return true;
+  }
+
+  bool hasNpcShopAccess(String npcId) =>
+      npcId == 'elder' ||
+      npcId == 'ariana' ||
+      npcId == 'baba_galya' ||
+      npcId == 'alenka';
+
+  bool canBuyShopItem(String itemId) {
+    final item = GameContent.shopItemById(itemId);
+    if (item == null || hasPurchasedShopItem(itemId) || coins < item.price) {
+      return false;
+    }
+    final requiredQuest = item.requiredQuestId;
+    if (requiredQuest != null &&
+        quest(requiredQuest)?.state != QuestState.active) {
+      return false;
+    }
+    if (item.effect == ShopEffect.heal && playerHp >= playerMaxHp) return false;
+    return true;
+  }
+
+  /// Покупка товара и его эффект выполняются одной операцией, поэтому двойной
+  /// клик не может повторно применить одноразовый предмет.
+  bool buyShopItem(String itemId) {
+    final item = GameContent.shopItemById(itemId);
+    if (item == null || !canBuyShopItem(itemId)) return false;
+    _coins -= item.price;
+    switch (item.effect) {
+      case ShopEffect.heal:
+        _playerHp = (_playerHp + item.amount).clamp(0, playerMaxHp).toInt();
+      case ShopEffect.increaseMaxHp:
+        _bonusMaxHp += item.amount;
+      case ShopEffect.addItem:
+        final itemKey = item.itemId ?? item.id;
+        _items[itemKey] = itemCount(itemKey) + 1;
+      case ShopEffect.damage:
+        _playerHp = (_playerHp - item.amount).clamp(0, playerMaxHp).toInt();
+    }
+    _purchasedShopItems.add(itemId);
+    notifyListeners();
+    return true;
+  }
+
+  bool removeItem(String itemId) {
+    final count = itemCount(itemId);
+    if (count <= 0) return false;
+    if (count == 1) {
+      _items.remove(itemId);
+    } else {
+      _items[itemId] = count - 1;
+    }
+    notifyListeners();
+    return true;
+  }
+
+  /// Объединяет две кости с одинаковой способностью и уровнем.
+  bool mergeDice(int firstIndex, int secondIndex) {
+    if (firstIndex == secondIndex ||
+        firstIndex < 0 ||
+        secondIndex < 0 ||
+        firstIndex >= _dice.length ||
+        secondIndex >= _dice.length) {
+      return false;
+    }
+    final first = _dice[firstIndex];
+    final second = _dice[secondIndex];
+    if (first.ability != second.ability || first.level != second.level) {
+      return false;
+    }
+    if (first.level >= Dice.maxLevel) return false;
+    final low = min(firstIndex, secondIndex);
+    final high = max(firstIndex, secondIndex);
+    _dice.removeAt(high);
+    _dice.removeAt(low);
+    _dice.add(first.copyWith(level: first.level + 1));
+    notifyListeners();
+    return true;
+  }
+
+  @Deprecated('Используйте mergeDice')
+  bool upgradeDice(String diceId) {
+    final index = _dice.indexWhere((dice) => dice.id == diceId);
+    if (index < 0 || !_dice[index].canUpgrade) return false;
+    final cost = 25 * _dice[index].level;
+    if (!spendCoins(cost)) return false;
+    _dice[index] = _dice[index].copyWith(level: _dice[index].level + 1);
+    notifyListeners();
+    return true;
+  }
+
+  void markEnemyDefeated(String spawnKey) {
+    _defeatedEnemyKeys.add(spawnKey);
+    _enemyRespawnAt[spawnKey] = DateTime.now().add(enemyRespawnDelay);
+    notifyListeners();
+  }
+
+  void addDice(Dice dice) {
+    _dice.add(dice);
+    notifyListeners();
+  }
+
+  // --- Поиск объектов ---
+
+  /// Делает один тап по поиску. Ровно десятый тап завершает поиск; следующие
+  /// вызовы возвращают тот же результат и не выдают награду повторно.
+  SearchResult searchProp(String propId) {
+    final prop = Locations.propById(propId);
+    if (prop == null || !prop.searchable) {
+      return SearchResult(
+        propId: propId,
+        taps: searchTapCount(propId),
+        completed: false,
+        accepted: false,
+      );
+    }
+
+    final previous = _searchResults[propId];
+    if (previous != null && previous.completed) return previous;
+
+    final taps = (_searchTaps[propId] ?? 0) + 1;
+    _searchTaps[propId] = taps.clamp(0, SearchResult.requiredTaps).toInt();
+    if (taps < SearchResult.requiredTaps) {
+      final result = SearchResult(propId: propId, taps: taps, completed: false);
+      _searchResults[propId] = result;
+      notifyListeners();
+      return result;
+    }
+
+    final result = _completeSearch(prop);
+    _searchResults[propId] = result;
+    notifyListeners();
+    return result;
+  }
+
+  SearchResult _completeSearch(LocationProp prop) {
+    final syncQuest = _quests['q_sync_async'];
+    final hasSyncAsyncQuest =
+        syncQuest?.state == QuestState.active &&
+        syncQuest?.quest.searchPropId == prop.id &&
+        prop.specialItemId == syncQuest?.quest.itemId;
+    // Специальный предмет действительно лежит в конкретном кусте. Его можно
+    // найти и до разговора с Малёком: тогда он останется в инвентаре, а после
+    // принятия задания обычная доставка завершит квест.
+    if (prop.specialItemId != null) {
+      final itemId = prop.specialItemId!;
+      _items[itemId] = itemCount(itemId) + 1;
+      if (hasSyncAsyncQuest) {
+        progressQuests(itemId: itemId, notify: false);
+      }
+      return SearchResult(
+        propId: prop.id,
+        taps: SearchResult.requiredTaps,
+        completed: true,
+        rewardType: SearchRewardType.item,
+        amount: 1,
+        itemId: itemId,
+      );
+    }
+
+    // Кейсы должны оставаться редкой находкой: обычный поиск чаще даёт
+    // небольшое лечение, монеты или опыт.
+    final rareRoll = _random.nextInt(100);
+    final reward = rareRoll < 2
+        ? (SearchRewardType.artifactCase, 1)
+        : rareRoll < 4
+        ? (SearchRewardType.diceCase, 1)
+        : switch (_random.nextInt(3)) {
+            0 => (SearchRewardType.hp, 5),
+            1 => (SearchRewardType.coins, 5),
+            _ => (SearchRewardType.xp, 5),
+          };
+    switch (reward.$1) {
+      case SearchRewardType.hp:
+        _playerHp = (_playerHp + reward.$2).clamp(0, playerMaxHp).toInt();
+      case SearchRewardType.coins:
+        _coins += reward.$2;
+        progressQuests(coinsEarned: reward.$2, notify: false);
+      case SearchRewardType.xp:
+        _addXpSilently(reward.$2);
+      case SearchRewardType.artifactCase:
+        _cases[CaseType.artifact] = caseCount(CaseType.artifact) + reward.$2;
+      case SearchRewardType.diceCase:
+        _cases[CaseType.dice] = caseCount(CaseType.dice) + reward.$2;
+      case SearchRewardType.item:
+      case SearchRewardType.none:
+        break;
+    }
+    return SearchResult(
+      propId: prop.id,
+      taps: SearchResult.requiredTaps,
+      completed: true,
+      rewardType: reward.$1,
+      amount: reward.$2,
+    );
+  }
+
+  // --- Квесты ---
+
+  QuestProgress? quest(String id) => _quests[id];
+
+  bool canActivateQuest(String id, {String? npcId}) {
+    final q = _quests[id];
+    if (q == null || q.state != QuestState.notStarted) return false;
+    final acceptanceNpcId = q.quest.acceptanceNpcId;
+    return acceptanceNpcId == null || acceptanceNpcId == npcId;
+  }
+
+  bool activateQuest(String id, {String? npcId}) {
+    if (!canActivateQuest(id, npcId: npcId)) return false;
+    final q = _quests[id]!;
+    q.state = QuestState.active;
+    notifyListeners();
+    return true;
+  }
+
+  /// Начисляет прогресс по типу цели. Активируетcompleted-состояние при достижении.
+  void progressQuests({
+    String? enemyId,
+    String? locationId,
+    int coinsEarned = 0,
+    String? itemId,
+    String? miniGameId,
+    bool notify = true,
+  }) {
+    bool changed = false;
+    for (final q in _quests.values) {
+      if (q.state != QuestState.active) continue;
+
+      switch (q.quest.type) {
+        case QuestType.kill:
+          if (enemyId != null && q.quest.enemyId == enemyId) {
+            q.progress = (q.progress + 1).clamp(0, q.quest.target).toInt();
+            changed = true;
+          }
+        case QuestType.location:
+          if (locationId != null && q.quest.locationId == locationId) {
+            q.progress = q.quest.target;
+            changed = true;
+          }
+        case QuestType.collect:
+          if (coinsEarned > 0) {
+            q.progress = (q.progress + coinsEarned)
+                .clamp(0, q.quest.target)
+                .toInt();
+            changed = true;
+          }
+        case QuestType.deliverItem:
+          if (itemId != null && q.quest.itemId == itemId) {
+            q.progress = q.quest.target;
+            changed = true;
+          }
+        case QuestType.miniGame:
+          if (miniGameId != null && q.quest.miniGameId == miniGameId) {
+            q.progress = (q.progress + 1).clamp(0, q.quest.target).toInt();
+            changed = true;
+          }
+      }
+
+      if (q.progress >= q.quest.target &&
+          q.quest.type != QuestType.deliverItem) {
+        q.state = QuestState.completed;
+      }
+    }
+    if (changed && notify) notifyListeners();
+  }
+
+  /// Завершает активную мини-игру и переводит её в состояние награды.
+  bool completeMiniGameQuest(String id, {String? miniGameId}) {
+    final progress = _quests[id];
+    if (progress == null ||
+        progress.state != QuestState.active ||
+        progress.quest.type != QuestType.miniGame ||
+        (miniGameId != null && progress.quest.miniGameId != miniGameId)) {
+      return false;
+    }
+    progress.progress = progress.quest.target;
+    progress.state = QuestState.completed;
+    notifyListeners();
+    return true;
+  }
+
+  bool completeSongQuest() =>
+      completeMiniGameQuest('q_song', miniGameId: 'song');
+
+  bool completeDeliveryQuest(String id) {
+    final progress = _quests[id];
+    final itemId = progress?.quest.itemId;
+    if (progress == null ||
+        progress.state != QuestState.active ||
+        progress.quest.type != QuestType.deliverItem ||
+        itemId == null ||
+        !hasItem(itemId)) {
+      return false;
+    }
+    final count = itemCount(itemId);
+    if (count == 1) {
+      _items.remove(itemId);
+    } else {
+      _items[itemId] = count - 1;
+    }
+    progress.progress = progress.quest.target;
+    progress.state = QuestState.completed;
+    notifyListeners();
+    return true;
+  }
+
+  /// Забирает награду за выполненный квест.
+  bool claimQuest(String id) {
+    final q = _quests[id];
+    if (q == null || q.state != QuestState.completed) return false;
+    q.state = QuestState.claimed;
+    _cases[CaseType.artifact] =
+        caseCount(CaseType.artifact) + q.quest.artifactCaseReward;
+    _coins += q.quest.coinReward;
+    _addXpSilently(q.quest.xpReward);
+    final skinRewardId = q.quest.skinRewardId;
+    final skinReward = skinRewardId == null
+        ? null
+        : GameContent.skinById(skinRewardId);
+    if (skinReward != null) _ownedSkinIds.add(skinReward.id);
+    notifyListeners();
+    return true;
+  }
+
+  /// Возвращает награды за завершённые задания. Вызывается только из явного
+  /// действия игрока «Получить награду».
+  int claimCompletedQuests() {
+    final completed = _quests.values
+        .where((progress) => progress.state == QuestState.completed)
+        .map((progress) => progress.quest.id)
+        .toList();
+    for (final id in completed) {
+      claimQuest(id);
+    }
+    return completed.length;
+  }
+
+  // --- Сохранение ---
+
+  Map<String, dynamic> toJson() => {
+    'coins': _coins,
+    'xp': _xp,
+    'level': _level,
+    'playerHp': playerHp,
+    'bonusMaxHp': _bonusMaxHp,
+    'dicePerTurn': dicePerTurn,
+    'rerollsPerRound': rerollsPerRound,
+    'cases': {for (final entry in _cases.entries) entry.key.name: entry.value},
+    'artifacts': {
+      for (final entry in _artifacts.entries) entry.key.name: entry.value,
+    },
+    'items': Map<String, int>.from(_items),
+    'purchasedShopItems': _purchasedShopItems.toList(),
+    'pendingArtifactChoices': [
+      for (final artifact in _pendingArtifactChoices) artifact.name,
+    ],
+    'currentLocationId': _currentLocationId,
+    'ownedSkins': _ownedSkinIds.toList(),
+    'selectedSkinId': _selectedSkinId,
+    'searches': {
+      for (final entry in _searchResults.entries)
+        entry.key: {
+          'taps': _searchTaps[entry.key] ?? entry.value.taps,
+          'completed': entry.value.completed,
+          'accepted': entry.value.accepted,
+          'rewardType': entry.value.rewardType.name,
+          'amount': entry.value.amount,
+          'itemId': entry.value.itemId,
+        },
+    },
+    'defeatedEnemies': [
+      for (final key in _defeatedEnemyKeys.toList())
+        if (enemyRespawnRemaining(key) != null) key,
+    ],
+    'enemyRespawns': {
+      for (final key in _enemyRespawnAt.keys.toList())
+        if (enemyRespawnRemaining(key) != null)
+          key: _enemyRespawnAt[key]!.toIso8601String(),
+    },
+    'dice': _dice
+        .map(
+          (d) => {
+            'id': d.id,
+            'name': d.name,
+            'baseFaces': d.baseFaces,
+            'level': d.level,
+            'ability': d.ability.name,
+            'visualKey': d.visualKey,
+          },
+        )
+        .toList(),
+    'quests': _quests.map(
+      (key, value) => MapEntry(key, {
+        'state': value.state.name,
+        'progress': value.progress,
+      }),
+    ),
+  };
+
+  void fromJson(Map<String, dynamic> json) {
+    _cases.clear();
+    final cases = json['cases'] as Map? ?? const {};
+    for (final type in CaseType.values) {
+      _cases[type] = max(0, (cases[type.name] as int?) ?? 0);
+    }
+    _artifacts.clear();
+    final artifacts = json['artifacts'] as Map? ?? const {};
+    for (final artifact in Artifact.values) {
+      final count = (artifacts[artifact.name] as int?) ?? 0;
+      if (count > 0) _artifacts[artifact] = count;
+    }
+    final pending = json['pendingArtifactChoices'] as List? ?? const [];
+    _pendingArtifactChoices = Artifact.values
+        .where((artifact) => pending.contains(artifact.name))
+        .take(3)
+        .toList();
+    _coins = json['coins'] as int? ?? 50;
+    _xp = json['xp'] as int? ?? 0;
+    _level = json['level'] as int? ?? 1;
+    _bonusMaxHp = (json['bonusMaxHp'] as int? ?? 0).clamp(0, 1000).toInt();
+    _playerHp = (json['playerHp'] as int? ?? playerMaxHp)
+        .clamp(0, playerMaxHp)
+        .toInt();
+    _dicePerTurn = (json['dicePerTurn'] as int? ?? 1)
+        .clamp(1, maxDicePerTurn)
+        .toInt();
+    _rerollsPerRound = (json['rerollsPerRound'] as int? ?? 1)
+        .clamp(1, maxRerollsPerRound)
+        .toInt();
+    _items.clear();
+    final itemsJson = json['items'];
+    if (itemsJson is Map) {
+      for (final entry in itemsJson.entries) {
+        final count = entry.value is int ? entry.value as int : 0;
+        if (count > 0) _items[entry.key.toString()] = count;
+      }
+    }
+    _purchasedShopItems
+      ..clear()
+      ..addAll(
+        (json['purchasedShopItems'] as List?)?.whereType<String>() ?? const [],
+      );
+    _currentLocationId = json['currentLocationId'] as String? ?? 'meadow';
+
+    _ownedSkinIds
+      ..clear()
+      ..add(PlayerSkin.defaultSkin.id);
+    final ownedSkins = json['ownedSkins'] as List?;
+    for (final skinId in ownedSkins?.whereType<String>() ?? const <String>[]) {
+      final skin = GameContent.skinById(skinId);
+      if (skin != null) _ownedSkinIds.add(skin.id);
+    }
+    final selectedSkinId = json['selectedSkinId'] as String?;
+    final selectedSkin = selectedSkinId == null
+        ? null
+        : GameContent.skinById(selectedSkinId);
+    _selectedSkinId = selectedSkin != null && hasSkin(selectedSkin.id)
+        ? selectedSkin.id
+        : PlayerSkin.defaultSkin.id;
+
+    _searchTaps.clear();
+    _searchResults.clear();
+    final searches = json['searches'];
+    if (searches is Map) {
+      for (final entry in searches.entries) {
+        final propId = entry.key.toString();
+        final data = entry.value;
+        if (data is! Map || Locations.propById(propId) == null) continue;
+        final taps = ((data['taps'] as int?) ?? 0)
+            .clamp(0, SearchResult.requiredTaps)
+            .toInt();
+        final completed =
+            data['completed'] == true || taps >= SearchResult.requiredTaps;
+        final rewardTypeName = data['rewardType']?.toString();
+        final rewardType = SearchRewardType.values.firstWhere(
+          (candidate) => candidate.name == rewardTypeName,
+          orElse: () => SearchRewardType.none,
+        );
+        final result = SearchResult(
+          propId: propId,
+          taps: taps,
+          completed: completed,
+          accepted: data['accepted'] != false,
+          rewardType: rewardType,
+          amount: (data['amount'] as int?) ?? 0,
+          itemId: data['itemId'] as String?,
+        );
+        _searchTaps[propId] = taps;
+        _searchResults[propId] = result;
+      }
+    }
+
+    final now = DateTime.now();
+    _defeatedEnemyKeys = {};
+    _enemyRespawnAt = {};
+    final respawns = json['enemyRespawns'] as Map?;
+    if (respawns != null) {
+      for (final entry in respawns.entries) {
+        final value = DateTime.tryParse(entry.value.toString());
+        if (value != null && value.isAfter(now)) {
+          _defeatedEnemyKeys.add(entry.key.toString());
+          _enemyRespawnAt[entry.key.toString()] = value;
+        }
+      }
+    }
+    // Старые сохранения хранили только факт победы. Даем таким записям
+    // честное пятиминутное окно вместо вечного исчезновения врага.
+    final defeated = json['defeatedEnemies'] as List?;
+    for (final key in defeated?.whereType<String>() ?? const <String>[]) {
+      if (_enemyRespawnAt.containsKey(key)) continue;
+      _defeatedEnemyKeys.add(key);
+      _enemyRespawnAt[key] = now.add(enemyRespawnDelay);
+    }
+
+    final diceJson = json['dice'] as List?;
+    if (diceJson != null) {
+      _dice = diceJson.map((d) {
+        final id = d['id'] as String;
+        final template = GameContent.diceById(id);
+        final abilityName = d['ability'] as String?;
+        final ability = DiceAbility.values.where(
+          (candidate) => candidate.name == abilityName,
+        );
+        return Dice(
+          id: id,
+          name: d['name'] as String? ?? template?.name ?? id,
+          baseFaces: (d['baseFaces'] as List).cast<int>(),
+          level: (d['level'] as int? ?? 1).clamp(1, Dice.maxLevel).toInt(),
+          ability: ability.isEmpty
+              ? template?.ability ?? DiceAbility.none
+              : ability.first,
+          visualKey:
+              d['visualKey'] as String? ?? template?.visualKey ?? 'blade',
+        );
+      }).toList();
+      if (_dice.isEmpty) _dice = [GameContent.starterDice];
+    }
+
+    // Полностью пересоздаём карту: неполный или старый JSON не должен
+    // оставлять в памяти состояние задания от предыдущего сейва.
+    _quests = {
+      for (final q in GameContent.quests) q.id: QuestProgress(quest: q),
+    };
+    final questsJson = json['quests'];
+    if (questsJson is Map) {
+      for (final entry in questsJson.entries) {
+        final q = _quests[entry.key.toString()];
+        final data = entry.value;
+        if (q == null || data is! Map) continue;
+        final stateName = data['state']?.toString();
+        final state = QuestState.values.where(
+          (candidate) => candidate.name == stateName,
+        );
+        q.state = state.isEmpty ? QuestState.notStarted : state.first;
+        final rawProgress = data['progress'];
+        final progress = rawProgress is int ? rawProgress : 0;
+        q.progress = progress.clamp(0, q.quest.target).toInt();
+        if (q.state == QuestState.completed && q.progress < q.quest.target) {
+          q.progress = q.quest.target;
+        }
+      }
+    }
+    notifyListeners();
+  }
+
+  /// Полностью возвращает прогресс к состоянию новой игры.
+  void reset() {
+    _resetValues();
+    notifyListeners();
+  }
+
+  void _resetValues() {
+    _cases.clear();
+    _artifacts.clear();
+    _items.clear();
+    _purchasedShopItems.clear();
+    _pendingArtifactChoices = [];
+    _ownedSkinIds
+      ..clear()
+      ..add(PlayerSkin.defaultSkin.id);
+    _selectedSkinId = PlayerSkin.defaultSkin.id;
+    _searchTaps.clear();
+    _searchResults.clear();
+    _coins = 50;
+    _xp = 0;
+    _level = 1;
+    _playerHp = 30;
+    _bonusMaxHp = 0;
+    _dicePerTurn = 1;
+    _rerollsPerRound = 1;
+    _currentLocationId = 'meadow';
+    _dice = [GameContent.starterDice];
+    _defeatedEnemyKeys = {};
+    _enemyRespawnAt = {};
+    _quests = {
+      for (final q in GameContent.quests) q.id: QuestProgress(quest: q),
+    };
+  }
+
+  Future<void> _saveQueue = Future.value();
+
+  Future<void> save(String saveDir) {
+    final snapshot = jsonEncode(toJson());
+    // Открытие кейса и выбор награды могут вызвать два сейва подряд.
+    // Пишем последовательно, чтобы старый снимок не затёр новый.
+    final operation = _saveQueue.then((_) async {
+      final file = File(p.join(saveDir, 'save.json'));
+      await file.create(recursive: true);
+      await file.writeAsString(snapshot, flush: true);
+    });
+    _saveQueue = operation.catchError((Object error) {
+      debugPrint('Не удалось сохранить прогресс: $error');
+    });
+    return operation;
+  }
+
+  Future<bool> load(String saveDir) async {
+    try {
+      final file = File(p.join(saveDir, 'save.json'));
+      if (!await file.exists()) return false;
+      final json =
+          jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      fromJson(json);
+      return true;
+    } catch (e) {
+      debugPrint('Не удалось загрузить сохранение: $e');
+      return false;
+    }
+  }
+
+  Future<void> clearSave(String saveDir) async {
+    await _saveQueue;
+    try {
+      final file = File(p.join(saveDir, 'save.json'));
+      if (await file.exists()) await file.delete();
+    } catch (e) {
+      debugPrint('Не удалось стереть сохранение: $e');
+    }
+  }
+}
+
+/// Прогресс по конкретному квесту.
+class QuestProgress extends ChangeNotifier {
+  QuestProgress({required this.quest});
+
+  final Quest quest;
+  QuestState state = QuestState.notStarted;
+  int progress = 0;
+
+  double get progressFraction => quest.target == 0
+      ? 0
+      : (progress / quest.target).clamp(0.0, 1.0).toDouble();
+}
+
+enum SearchRewardType { none, hp, coins, xp, artifactCase, diceCase, item }
+
+/// Результат одного шага или завершённого поиска объекта.
+@immutable
+class SearchResult {
+  const SearchResult({
+    required this.propId,
+    required this.taps,
+    required this.completed,
+    this.accepted = true,
+    this.rewardType = SearchRewardType.none,
+    this.amount = 0,
+    this.itemId,
+  });
+
+  static const int requiredTaps = 10;
+
+  final String propId;
+  final int taps;
+  final bool completed;
+  final bool accepted;
+  final SearchRewardType rewardType;
+  final int amount;
+  final String? itemId;
+
+  bool get isComplete => completed;
+  bool get isCompleted => completed;
+  int get progress => taps;
+  int get tapCount => taps;
+  SearchRewardType get reward => rewardType;
+  int get rewardAmount => amount;
+  String? get specialItemId => itemId;
+  bool get foundSpecialItem => itemId != null;
+}

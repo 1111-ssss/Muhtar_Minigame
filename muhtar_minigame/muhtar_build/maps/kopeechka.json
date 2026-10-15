@@ -1,0 +1,189 @@
+{
+  "format": 1,
+  "id": "kopeechka",
+  "name": "Копеечка",
+  "tiles": [
+    [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    [
+      1,
+      0,
+      0,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      1
+    ],
+    [
+      4,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      0,
+      1
+    ],
+    [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    [
+      1,
+      0,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      1
+    ],
+    [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  ],
+  "spawn": [
+    2,
+    4
+  ],
+  "enemies": [],
+  "npcs": [
+    {
+      "id": "alenka",
+      "name": "Алёнка",
+      "col": 9,
+      "row": 3
+    }
+  ],
+  "additionalNpcs": [
+    {
+      "id": "malek",
+      "name": "Малёк",
+      "col": 7,
+      "row": 5
+    }
+  ],
+  "exits": [
+    {
+      "col": 0,
+      "row": 3,
+      "targetId": "ruins",
+      "arrival": [
+        29,
+        5
+      ],
+      "direction": "auto"
+    }
+  ],
+  "props": [
+    {
+      "id": "kopeechka_counter",
+      "kind": "platform",
+      "col": 2,
+      "row": 1,
+      "width": 3,
+      "height": 1,
+      "blocksMovement": false,
+      "variant": 0,
+      "searchable": false
+    },
+    {
+      "id": "kopeechka_shelf",
+      "kind": "platform",
+      "col": 6,
+      "row": 1,
+      "width": 3,
+      "height": 1,
+      "blocksMovement": false,
+      "variant": 1,
+      "searchable": false
+    },
+    {
+      "id": "kopeechka_bench",
+      "kind": "bench",
+      "col": 4,
+      "row": 5,
+      "width": 1,
+      "height": 1,
+      "blocksMovement": false,
+      "variant": 0,
+      "searchable": false
+    }
+  ],
+  "outsideTile": 5,
+  "outsideGroundRegions": []
+}

@@ -1,0 +1,16 @@
+# Flutter and Dart generated files
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/build/
+**/coverage/
+
+# Local runtime data
+muhtar_minigame/save/
+muhtar_minigame/muhtar_build/backups/
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+*.iml

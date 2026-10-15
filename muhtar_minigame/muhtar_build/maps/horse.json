@@ -1,0 +1,125 @@
+{
+  "format": 1,
+  "id": "horse",
+  "name": "Конь",
+  "tiles": [
+    [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    [
+      1,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      0,
+      3,
+      0,
+      0,
+      1
+    ],
+    [
+      4,
+      0,
+      0,
+      0,
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  ],
+  "spawn": [
+    1,
+    3
+  ],
+  "enemies": [],
+  "npcs": [],
+  "additionalNpcs": [],
+  "exits": [
+    {
+      "col": 0,
+      "row": 3,
+      "targetId": "ruins",
+      "arrival": [
+        38,
+        2
+      ],
+      "direction": "auto"
+    }
+  ],
+  "props": [
+    {
+      "id": "prop_6_2",
+      "kind": "bush",
+      "col": 6,
+      "row": 2,
+      "width": 1,
+      "height": 1,
+      "blocksMovement": true,
+      "variant": 0,
+      "searchable": true
+    }
+  ],
+  "outsideTile": 6,
+  "outsideGroundRegions": []
+}
