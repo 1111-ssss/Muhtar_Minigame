@@ -235,6 +235,20 @@ class MuhtarGame extends FlameGame
         return KeyEventResult.handled;
       }
       if (event is KeyDownEvent &&
+          overlays.isActive(overlaySearch) &&
+          (event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.numpadEnter ||
+              event.logicalKey == LogicalKeyboardKey.space)) {
+        final result = _searchingProp == null
+            ? null
+            : gameState.searchResult(_searchingProp!.id);
+        if (result?.completed == true &&
+            result?.rewardType == SearchRewardType.none) {
+          closeSearch();
+          return KeyEventResult.handled;
+        }
+      }
+      if (event is KeyDownEvent &&
           overlays.isActive(overlayBattleConfirm) &&
           (event.logicalKey == LogicalKeyboardKey.enter ||
               event.logicalKey == LogicalKeyboardKey.numpadEnter ||

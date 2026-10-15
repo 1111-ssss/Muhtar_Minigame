@@ -135,7 +135,14 @@ class Locations {
     0,
     0,
   ];
-  static const _bridgeRailing = <int>[
+  // ignore: unused_field, retained for old editor drafts.
+  static const _bridgeCenterExitEdge = <int>[
+    ..._bridgeBank,
+    7,
+    7,
+    7,
+    7,
+    4,
     7,
     7,
     7,
@@ -152,15 +159,83 @@ class Locations {
     7,
     7,
     7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+  ];
+  // ignore: unused_field, retained for old editor drafts.
+  static const _bridgeCenterExitEdgeFixed = <int>[
+    ..._bridgeBank,
+    7,
+    7,
+    7,
+    7,
+    4,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    ..._bridgeBank,
+  ];
+  static const _bridgeRailingWithCenterExit = <int>[
+    7,
+    7,
+    7,
+    7,
+    4,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+  ];
+  static const _bridgeCenterExitEdgeCorrect = <int>[
+    ..._bridgeBank,
+    ..._bridgeRailingWithCenterExit,
+    ..._bridgeBank,
   ];
   static const _bridgeLand = <int>[
     ..._bridgeBank,
     ..._bridgeDeck,
-    ..._bridgeBank,
-  ];
-  static const _bridgeEdge = <int>[
-    ..._bridgeBank,
-    ..._bridgeRailing,
     ..._bridgeBank,
   ];
   static const _bridgeLeftExit = <int>[
@@ -175,11 +250,25 @@ class Locations {
     ..._bridgeBankWithExit,
     4,
   ];
-  static const _bridgeShopKopeechka = <int>[
+  static const _bridgeCollegeExit = _bridgeHorseExit;
+  static const _bridgeBankWithRightExit = <int>[
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    9,
+    4,
+  ];
+  static const _bridgeShopKopeechkaWithDorm = <int>[
     ..._bridgeBank,
     ..._bridgeDeck,
     4,
-    ..._bridgeBankWithExit,
+    ..._bridgeBankWithRightExit,
   ];
   static const _bridgeShopCheburechnaya = <int>[
     ..._bridgeBank,
@@ -194,14 +283,14 @@ class Locations {
     id: 'ruins',
     name: 'Мост',
     tiles: [
-      _bridgeEdge,
-      _bridgeLand,
+      _bridgeCenterExitEdgeCorrect,
       _bridgeHorseExit,
+      _bridgeCollegeExit,
       _bridgeLeftExit,
       _bridgeLand,
-      _bridgeShopKopeechka,
+      _bridgeShopKopeechkaWithDorm,
       _bridgeShopCheburechnaya,
-      _bridgeEdge,
+      _bridgeCenterExitEdgeCorrect,
     ],
     outsideTile: 6,
     outsideGroundRegions: [
@@ -222,9 +311,36 @@ class Locations {
     ],
     spawn: (2, 3),
     npcs: [NpcSpawn('ribka', 'Рибка', 21, 3)],
+    props: [
+      LocationProp(kind: LocationPropKind.tree, col: 3, row: 1, variant: 0),
+      LocationProp(kind: LocationPropKind.tree, col: 7, row: 6, variant: 1),
+      LocationProp(kind: LocationPropKind.bush, col: 5, row: 2, variant: 0),
+      LocationProp(kind: LocationPropKind.bush, col: 10, row: 5, variant: 1),
+    ],
     exits: [
+      LocationExit(
+        col: 16,
+        row: 0,
+        targetId: 'cheburechnaya',
+        arrival: (1, 4),
+        direction: ExitDirection.up,
+      ),
+      LocationExit(col: 39, row: 1, targetId: 'horse', arrival: (1, 4)),
+      LocationExit(
+        col: 39,
+        row: 2,
+        targetId: 'college',
+        arrival: (1, 5),
+        direction: ExitDirection.right,
+      ),
       LocationExit(col: 0, row: 3, targetId: 'forest', arrival: (20, 5)),
-      LocationExit(col: 39, row: 2, targetId: 'horse', arrival: (1, 3)),
+      LocationExit(
+        col: 39,
+        row: 5,
+        targetId: 'dormitory',
+        arrival: (8, 3),
+        direction: ExitDirection.right,
+      ),
       LocationExit(
         col: 28,
         row: 5,
@@ -239,24 +355,95 @@ class Locations {
         arrival: (1, 4),
         direction: ExitDirection.right,
       ),
+      LocationExit(
+        col: 16,
+        row: 7,
+        targetId: 'wb',
+        arrival: (1, 2),
+        direction: ExitDirection.down,
+      ),
     ],
   );
 
-  /// Небольшая площадка для телепорта «Конь».
+  /// Простая площадка Колледжа. Персонажи будут добавлены позже.
+  static const LocationDef college = LocationDef(
+    id: 'college',
+    name: 'Колледж',
+    tiles: [
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 2, 2, 2, 2, 2, 2, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 0, 0, 13, 0, 0, 0, 1],
+      [4, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    ],
+    spawn: (1, 5),
+    exits: [LocationExit(col: 0, row: 5, targetId: 'ruins', arrival: (39, 2))],
+  );
+
+  /// Простая площадка Общаги. Персонажи будут добавлены позже.
+  static const LocationDef dormitory = LocationDef(
+    id: 'dormitory',
+    name: 'Общага',
+    tiles: [
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 0, 10, 10, 0, 0, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 4],
+      [1, 0, 0, 13, 0, 0, 0, 13, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    ],
+    spawn: (8, 3),
+    exits: [LocationExit(col: 9, row: 3, targetId: 'ruins', arrival: (39, 5))],
+  );
+
+  /// Площадка ВБ. Персонажи будут добавлены позже.
+  static const LocationDef wb = LocationDef(
+    id: 'wb',
+    name: 'ВБ',
+    tiles: [
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [4, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 0, 14, 0, 0, 0, 0, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    ],
+    spawn: (1, 2),
+    exits: [LocationExit(col: 0, row: 2, targetId: 'ruins', arrival: (16, 7))],
+  );
+
+  /// Расширенная площадка для телепорта «Конь» без водяной рамки.
   static const LocationDef horse = LocationDef(
     id: 'horse',
     name: 'Конь',
     tiles: [
-      [6, 6, 6, 6, 6, 6, 6, 6],
-      [6, 9, 9, 13, 9, 9, 9, 6],
-      [6, 9, 9, 9, 9, 13, 9, 6],
-      [4, 9, 9, 9, 9, 9, 9, 6],
-      [6, 9, 9, 9, 9, 9, 9, 6],
-      [6, 6, 6, 6, 6, 6, 6, 6],
+      [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+      [9, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9],
+      [9, 9, 9, 0, 2, 2, 2, 2, 2, 2, 2, 0, 9, 9, 9, 9],
+      [9, 9, 9, 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 9, 9, 9],
+      [4, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9],
+      [9, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 9],
+      [9, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 9],
+      [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
     ],
-    outsideTile: 6,
-    spawn: (1, 3),
-    exits: [LocationExit(col: 0, row: 3, targetId: 'ruins', arrival: (38, 2))],
+    outsideTile: 9,
+    spawn: (3, 4),
+    props: [
+      LocationProp(kind: LocationPropKind.tree, col: 5, row: 1, variant: 1),
+      LocationProp(kind: LocationPropKind.tree, col: 11, row: 6, variant: 2),
+      LocationProp(
+        id: 'horse_search_bush',
+        kind: LocationPropKind.bush,
+        col: 9,
+        row: 3,
+        searchable: true,
+      ),
+    ],
+    exits: [LocationExit(col: 0, row: 4, targetId: 'ruins', arrival: (39, 1))],
   );
 
   /// Небольшой интерьер Копеечки в здании у Моста.
@@ -308,7 +495,7 @@ class Locations {
   /// Небольшой интерьер Чебуречной в том же здании у Моста.
   static const LocationDef cheburechnaya = LocationDef(
     id: 'cheburechnaya',
-    name: 'Чебуречная',
+    name: 'Донер (шаурмечная)',
     tiles: [
       [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
@@ -355,6 +542,9 @@ class Locations {
     forest,
     ruins,
     horse,
+    college,
+    dormitory,
+    wb,
     kopeechka,
     cheburechnaya,
   ];

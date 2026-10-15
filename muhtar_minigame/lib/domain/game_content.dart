@@ -562,7 +562,34 @@ class GameContent {
       DialogueNode(
         id: 'greeting',
         text:
-            'В Парке есть кусты и другие места, которые можно внимательно искать.',
+            'витя умнее меня во многих сферах\n'
+            'я вас ненавижу и не скрываю этого\n'
+            'вы все пешки моего фанфика',
+        choices: [DialogueChoice(label: 'До встречи')],
+      ),
+    ],
+  );
+
+  /// Реплики Бубера вынесены в дерево диалогов отдельно от боевых фраз,
+  /// чтобы позже можно было поставить персонажа на любую карту без миграции
+  /// контента.
+  static const DialogueTree buberDialogue = DialogueTree(
+    startNodeId: 'greeting',
+    nodes: [
+      DialogueNode(
+        id: 'greeting',
+        text:
+            'я тебя подовлю\n'
+            'я тебя придушу\n'
+            'я тебя обоссу\n'
+            'Я тебя унижу на весь колледж\n'
+            'Тебе конец, ты получишь за гнилой базар\n'
+            'я уже подучил кондишонал\n'
+            'стрегите мне полубокс\n'
+            'только не полубокс!\n'
+            'protected это доступ по паролю\n'
+            'я собираюсь в ломбард\n'
+            '117 iq. как вам показатель? первый самый лучший в России',
         choices: [DialogueChoice(label: 'До встречи')],
       ),
     ],
@@ -664,6 +691,7 @@ class GameContent {
     if (npcId == 'malek') return malekDialogue;
     if (npcId == 'ribka') return ribkaDialogue;
     if (npcId == 'sofia') return sofiaDialogue;
+    if (npcId == 'buber') return buberDialogue;
     return null;
   }
 }

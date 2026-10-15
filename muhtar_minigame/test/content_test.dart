@@ -86,6 +86,10 @@ void main() {
 
   test('новые NPC, квест и товары заведены в контенте', () {
     expect(Locations.cheburechnaya.npcs.single.id, 'baba_galya');
+    expect(Locations.cheburechnaya.name, 'Донер (шаурмечная)');
+    expect(Locations.college.name, 'Колледж');
+    expect(Locations.dormitory.name, 'Общага');
+    expect(Locations.wb.name, 'ВБ');
     expect(Locations.kopeechka.npcs.single.id, 'alenka');
     expect(GameContent.dialogueForNpc('baba_galya'), isNotNull);
     expect(GameContent.dialogueForNpc('alenka'), isNotNull);
@@ -116,6 +120,7 @@ void main() {
     expect(GameContent.dialogueForNpc('malek'), isNotNull);
     expect(GameContent.dialogueForNpc('ribka'), isNotNull);
     expect(GameContent.dialogueForNpc('sofia'), isNotNull);
+    expect(GameContent.dialogueForNpc('buber'), isNotNull);
   });
 
   test(
@@ -157,5 +162,15 @@ void main() {
     expect(gopnik.burnDamage, 0);
     expect(gopnik.maxHp, 20);
     expect(gopnik.diceFaces, [1, 2, 2, 3, 3, 4]);
+  });
+
+  test('Бубер и София получили новые реплики', () {
+    final buber = GameContent.dialogueForNpc('buber')!.nodeById('greeting')!;
+    final sofia = GameContent.dialogueForNpc('sofia')!.nodeById('greeting')!;
+
+    expect(buber.text, contains('protected это доступ по паролю'));
+    expect(buber.text, contains('117 iq. как вам показатель?'));
+    expect(sofia.text, contains('витя умнее меня во многих сферах'));
+    expect(sofia.text, contains('вы все пешки моего фанфика'));
   });
 }

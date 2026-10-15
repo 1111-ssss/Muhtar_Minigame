@@ -448,18 +448,30 @@ class GameState extends ChangeNotifier {
       );
     }
 
-    // Кейсы должны оставаться редкой находкой: обычный поиск чаще даёт
-    // небольшое лечение, монеты или опыт.
-    final rareRoll = _random.nextInt(100);
-    final reward = rareRoll < 2
-        ? (SearchRewardType.artifactCase, 1)
-        : rareRoll < 4
-        ? (SearchRewardType.diceCase, 1)
-        : switch (_random.nextInt(3)) {
-            0 => (SearchRewardType.hp, 5),
-            1 => (SearchRewardType.coins, 5),
-            _ => (SearchRewardType.xp, 5),
-          };
+    // В кустах добыча небольшая: иногда там вообще ничего нет, а если есть,
+    // это только +1 HP или +5 монет. Редкие кейсы и опыт остаются находками
+    // мусорных баков и других будущих searchable-объектов.
+    late final (SearchRewardType, int) reward;
+    if (prop.kind == LocationPropKind.bush) {
+      reward = switch (_random.nextInt(3)) {
+        0 => (SearchRewardType.none, 0),
+        1 => (SearchRewardType.hp, 1),
+        _ => (SearchRewardType.coins, 5),
+      };
+    } else {
+      // Кейсы должны оставаться редкой находкой: обычный поиск чаще даёт
+      // небольшое лечение, монеты или опыт.
+      final rareRoll = _random.nextInt(100);
+      reward = rareRoll < 2
+          ? (SearchRewardType.artifactCase, 1)
+          : rareRoll < 4
+          ? (SearchRewardType.diceCase, 1)
+          : switch (_random.nextInt(3)) {
+              0 => (SearchRewardType.hp, 5),
+              1 => (SearchRewardType.coins, 5),
+              _ => (SearchRewardType.xp, 5),
+            };
+    }
     switch (reward.$1) {
       case SearchRewardType.hp:
         _playerHp = (_playerHp + reward.$2).clamp(0, playerMaxHp).toInt();

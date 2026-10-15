@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../domain/location.dart';
 import '../../game_logic/game_state.dart';
@@ -104,6 +105,9 @@ class _SearchOverlayState extends State<SearchOverlay>
 
     final result = _result;
     final completed = result?.completed ?? false;
+    if (completed && result?.rewardType == SearchRewardType.none) {
+      return _buildEmptySearch();
+    }
     final colors = _palette(widget.prop.kind);
 
     return Material(
@@ -217,49 +221,147 @@ class _SearchOverlayState extends State<SearchOverlay>
     );
   }
 
-  Widget _buildAlreadySearched() => Material(
-    color: Colors.transparent,
-    child: Stack(
-      fit: StackFit.expand,
-      children: [
-        const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xE6131B2C), Color(0xF20A101C)],
-            ),
-          ),
-        ),
-        SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Здесь ничего нет...',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: widget.onClose,
-                    child: const Text('Закрыть'),
-                  ),
-                ],
+  Widget _buildAlreadySearched() {
+    if (_result?.rewardType == SearchRewardType.none) {
+      return _buildEmptySearch();
+    }
+    return Material(
+      color: Colors.transparent,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xE6131B2C), Color(0xF20A101C)],
               ),
             ),
           ),
-        ),
-      ],
+          SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Здесь ничего нет...',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: widget.onClose,
+                      child: const Text('Закрыть'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptySearch() => Focus(
+    autofocus: true,
+    onKeyEvent: _handleEmptyKey,
+    child: Material(
+      color: Colors.transparent,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xE6131B2C), Color(0xF20A101C)],
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF171D2B),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFF3F805C)),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x66000000),
+                        blurRadius: 20,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.grass_rounded,
+                          color: Color(0xFF8BE6A0),
+                          size: 30,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'В кусте ничего нет',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        const Text(
+                          'Поищи в другом месте.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white60, fontSize: 12),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: widget.onClose,
+                          child: const Text('Закрыть'),
+                        ),
+                        const Text(
+                          'Space / Enter / Esc',
+                          style: TextStyle(color: Colors.white38, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     ),
   );
+
+  KeyEventResult _handleEmptyKey(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent &&
+        (event.logicalKey == LogicalKeyboardKey.space ||
+            event.logicalKey == LogicalKeyboardKey.enter ||
+            event.logicalKey == LogicalKeyboardKey.numpadEnter ||
+            event.logicalKey == LogicalKeyboardKey.escape)) {
+      widget.onClose?.call();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
 
   static _SearchPalette _palette(LocationPropKind kind) {
     switch (kind) {

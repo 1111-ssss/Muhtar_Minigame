@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muhtar_minigame/domain/artifact.dart';
@@ -7,6 +8,21 @@ import 'package:muhtar_minigame/domain/game_content.dart';
 import 'package:muhtar_minigame/domain/locations.dart';
 import 'package:muhtar_minigame/domain/quest.dart';
 import 'package:muhtar_minigame/game_logic/game_state.dart';
+
+class _FixedRandom implements Random {
+  const _FixedRandom(this.value);
+
+  final int value;
+
+  @override
+  bool nextBool() => value.isEven;
+
+  @override
+  double nextDouble() => value == 0 ? 0 : 0.5;
+
+  @override
+  int nextInt(int max) => value % max;
+}
 
 void main() {
   group('GameState', () {
@@ -355,6 +371,37 @@ void main() {
       final loaded = GameState()..fromJson(state.toJson());
       expect(loaded.searchProp(prop.id).itemId, 'sync_async');
       expect(loaded.itemCount('sync_async'), 1);
+    });
+
+    test('обычный куст даёт маленькую находку или ничего', () {
+      final emptyState = GameState(random: const _FixedRandom(0));
+      final emptyProp = Locations.horse.props.singleWhere(
+        (prop) => prop.searchable,
+      );
+      for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
+        emptyState.searchProp(emptyProp.id);
+      }
+      final empty = emptyState.searchResult(emptyProp.id)!;
+      expect(empty.rewardType, SearchRewardType.none);
+      expect(empty.amount, 0);
+
+      final hpState = GameState(random: const _FixedRandom(1));
+      for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
+        hpState.searchProp(emptyProp.id);
+      }
+      expect(hpState.searchResult(emptyProp.id)!.amount, 1);
+      expect(hpState.playerHp, 30);
+
+      final coinState = GameState(random: const _FixedRandom(2));
+      for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
+        coinState.searchProp(emptyProp.id);
+      }
+      expect(
+        coinState.searchResult(emptyProp.id)!.rewardType,
+        SearchRewardType.coins,
+      );
+      expect(coinState.searchResult(emptyProp.id)!.amount, 5);
+      expect(coinState.coins, 55);
     });
 
     test(
