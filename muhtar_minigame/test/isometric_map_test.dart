@@ -76,7 +76,7 @@ void main() {
       expect(Locations.meadow.npcs.single.id, 'ariana');
     });
 
-    test('forest is rectangular and arrivals are next to return exits', () {
+    test('arrivals are beside, not on, return exits', () {
       expect(Locations.forest.cols, greaterThan(Locations.forest.rows));
 
       for (final location in Locations.all) {
@@ -98,14 +98,24 @@ void main() {
             (candidate) => candidate.targetId == location.id,
           );
           expect(
-            returnExits.any(
-              (returnExit) =>
-                  (arrival.$1 - returnExit.col).abs() +
-                      (arrival.$2 - returnExit.row).abs() <=
-                  1,
-            ),
+            target.exitAt(arrival.$1, arrival.$2),
+            isNull,
+            reason:
+                '${location.id} -> ${exit.targetId} must not land on a portal',
+          );
+          final hasNearbyReturnExit = returnExits.any((returnExit) {
+            final distance =
+                (arrival.$1 - returnExit.col).abs() +
+                (arrival.$2 - returnExit.row).abs();
+            return distance <= 1 &&
+                (arrival.$1 != returnExit.col ||
+                    arrival.$2 != returnExit.row);
+          });
+          expect(
+            hasNearbyReturnExit,
             isTrue,
-            reason: '${location.id} -> ${exit.targetId} has no nearby return',
+            reason:
+                '${location.id} -> ${exit.targetId} must arrive beside, not on, the return exit',
           );
         }
       }

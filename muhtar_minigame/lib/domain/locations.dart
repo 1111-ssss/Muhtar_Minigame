@@ -401,7 +401,7 @@ class Locations {
       [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     ],
     spawn: (1, 5),
-    exits: [LocationExit(col: 0, row: 5, targetId: 'horse', arrival: (15, 2))],
+    exits: [LocationExit(col: 0, row: 5, targetId: 'horse', arrival: (14, 2))],
   );
 
   /// Простая площадка Общаги. Персонажи будут добавлены позже.
@@ -418,7 +418,7 @@ class Locations {
       [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     ],
     spawn: (8, 3),
-    exits: [LocationExit(col: 9, row: 3, targetId: 'horse', arrival: (15, 5))],
+    exits: [LocationExit(col: 9, row: 3, targetId: 'horse', arrival: (14, 5))],
   );
 
   /// Площадка ВБ. Персонажи будут добавлены позже.
@@ -435,7 +435,7 @@ class Locations {
       [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     ],
     spawn: (1, 2),
-    exits: [LocationExit(col: 0, row: 2, targetId: 'horse', arrival: (10, 7))],
+    exits: [LocationExit(col: 0, row: 2, targetId: 'horse', arrival: (10, 6))],
   );
 
   /// Расширенная площадка для телепорта «Конь» без водяной рамки.
@@ -466,7 +466,7 @@ class Locations {
       ),
     ],
     exits: [
-      LocationExit(col: 0, row: 4, targetId: 'ruins', arrival: (39, 2)),
+      LocationExit(col: 0, row: 4, targetId: 'ruins', arrival: (39, 1)),
       LocationExit(
         col: 5,
         row: 0,
