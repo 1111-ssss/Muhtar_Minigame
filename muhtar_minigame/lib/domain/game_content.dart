@@ -627,48 +627,13 @@ class GameContent {
         id: 'returned',
         text: 'Забирайте свои вонючие носки.',
         choices: [
-          DialogueChoice(
-            label: 'Я батю депнуууул!',
-            nextNodeId: 'final',
-          ),
+          DialogueChoice(label: 'Я батю депнуууул!', nextNodeId: 'final'),
         ],
       ),
       DialogueNode(
         id: 'final',
         text: 'Сотрудник ПВЗ молча возвращается за стойку.',
         choices: [DialogueChoice(label: 'Закрыть')],
-      ),
-    ],
-  );
-
-  static const DialogueTree ozonLockerDialogue = DialogueTree(
-    startNodeId: 'greeting',
-    nodes: [
-      DialogueNode(
-        id: 'greeting',
-        text: 'Раздевалка Озона. Три ролика подряд откроют редкий скин.',
-        textQuestId: 'q_kartofla_videos',
-        textByQuestState: {
-          QuestState.active:
-              'Ролики нельзя пропустить. Если закрыть окно, просмотр начнётся с первого ролика.',
-          QuestState.completed: 'Скин «Картофля» уже разблокирован.',
-          QuestState.claimed: 'Скин «Картофля» уже разблокирован.',
-        },
-        choices: [
-          DialogueChoice(
-            label: 'Взять задание и смотреть ролики',
-            questId: 'q_kartofla_videos',
-            openVideoSequence: true,
-            notification: 'Задание принято: три ролика в раздевалке Озона',
-          ),
-          DialogueChoice(
-            label: 'Продолжить просмотр',
-            requiredQuestId: 'q_kartofla_videos',
-            requiredQuestStates: {QuestState.active},
-            openVideoSequence: true,
-          ),
-          DialogueChoice(label: 'До встречи'),
-        ],
       ),
     ],
   );
@@ -948,10 +913,10 @@ class GameContent {
     Quest(
       id: 'q_kartofla_videos',
       title: 'Картофля',
-      description: 'Посмотрите три ролика подряд в раздевалке Озона.',
+      description: 'Посмотрите три ролика подряд в раздевалке ВБ.',
       type: QuestType.miniGame,
       miniGameId: 'kartofla_videos',
-      acceptanceNpcId: 'ozon_locker',
+      acceptancePropId: 'wb_fitting_room',
       target: 1,
       coinReward: 0,
       xpReward: 0,
@@ -974,7 +939,6 @@ class GameContent {
     if (npcId == 'shaurmek') return shaurmekDialogue;
     if (npcId == 'ilya') return ilyaDialogue;
     if (npcId == 'wb_employee') return wbEmployeeDialogue;
-    if (npcId == 'ozon_locker') return ozonLockerDialogue;
     if (npcId == 'malek') return malekDialogue;
     if (npcId == 'ribka') return ribkaDialogue;
     if (npcId == 'sofia') return sofiaDialogue;

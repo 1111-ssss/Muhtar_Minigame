@@ -25,9 +25,7 @@ class Locations {
     spawn: (7, 8),
     npcs: [NpcSpawn('ariana', 'Ариана', 2, 8)],
     exits: [LocationExit(col: 15, row: 6, targetId: 'forest', arrival: (1, 5))],
-    enemies: [
-      EnemySpawn('viktor_korneplod', 13, 4),
-    ],
+    enemies: [EnemySpawn('viktor_korneplod', 13, 4)],
     props: [
       LocationProp(kind: LocationPropKind.tree, col: 1, row: 3, variant: 0),
       LocationProp(kind: LocationPropKind.tree, col: 13, row: 3, variant: 1),
@@ -98,6 +96,7 @@ class Locations {
         col: 19,
         row: 3,
         variant: 2,
+        blocksMovement: false,
         searchable: true,
         specialItemId: 'sync_async',
       ),
@@ -450,7 +449,7 @@ class Locations {
     exits: [LocationExit(col: 9, row: 3, targetId: 'horse', arrival: (14, 5))],
   );
 
-  /// Площадка ВБ. Персонажи будут добавлены позже.
+  /// Площадка ВБ с сотрудником ПВЗ и интерактивной раздевалкой.
   static const LocationDef wb = LocationDef(
     id: 'wb',
     name: 'ВБ',
@@ -465,46 +464,19 @@ class Locations {
     ],
     spawn: (1, 2),
     npcs: [NpcSpawn('wb_employee', 'Сотрудник ПВЗ', 6, 3)],
-    exits: [LocationExit(col: 0, row: 2, targetId: 'horse', arrival: (10, 6))],
-  );
-
-  /// Озон с отдельной раздевалкой. Три ролика запускаются через NPC,
-  /// чтобы действие было заметно на карте и не зависело от скрытого тапа.
-  static const LocationDef ozon = LocationDef(
-    id: 'ozon',
-    name: 'Озон',
-    tiles: [
-      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-      [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-      [1, 0, 2, 2, 2, 2, 2, 2, 2, 2, 0, 1],
-      [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-      [1, 0, 0, 10, 10, 0, 0, 0, 10, 10, 0, 1],
-      [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    ],
-    spawn: (2, 3),
-    npcs: [NpcSpawn('ozon_locker', 'Раздевалка', 8, 3)],
     props: [
       LocationProp(
-        id: 'ozon_counter',
+        id: 'wb_fitting_room',
         kind: LocationPropKind.platform,
-        col: 2,
-        row: 1,
-        width: 3,
-        blocksMovement: false,
-        variant: 1,
-      ),
-      LocationProp(
-        id: 'ozon_fitting_room',
-        kind: LocationPropKind.platform,
-        col: 7,
-        row: 1,
+        col: 3,
+        row: 4,
         width: 3,
         blocksMovement: false,
         variant: 2,
+        interactionId: 'q_kartofla_videos',
       ),
     ],
-    exits: [LocationExit(col: 0, row: 3, targetId: 'horse', arrival: (10, 6))],
+    exits: [LocationExit(col: 0, row: 2, targetId: 'horse', arrival: (10, 6))],
   );
 
   /// Расширенная площадка для телепорта «Конь» без водяной рамки.
@@ -512,7 +484,7 @@ class Locations {
     id: 'horse',
     name: 'Конь',
     tiles: [
-      [9, 9, 9, 9, 9, 4, 9, 9, 9, 9, 4, 9, 9, 9, 9, 9],
+      [9, 9, 9, 9, 9, 4, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
       [9, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9],
       [9, 9, 9, 0, 2, 2, 2, 2, 2, 2, 2, 0, 9, 9, 9, 4],
       [9, 9, 9, 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 9, 9, 9],
@@ -563,13 +535,6 @@ class Locations {
         targetId: 'wb',
         arrival: (1, 2),
         direction: ExitDirection.down,
-      ),
-      LocationExit(
-        col: 10,
-        row: 0,
-        targetId: 'ozon',
-        arrival: (1, 3),
-        direction: ExitDirection.up,
       ),
     ],
   );
@@ -674,7 +639,6 @@ class Locations {
     college,
     dormitory,
     wb,
-    ozon,
     kopeechka,
     cheburechnaya,
   ];
@@ -690,10 +654,7 @@ class Locations {
     final cached = _allCache;
     if (cached != null) return cached;
 
-    final merged = <String, LocationDef>{
-      ..._builtInById,
-      ..._overrides,
-    };
+    final merged = <String, LocationDef>{..._builtInById, ..._overrides};
     return _allCache = List.unmodifiable(merged.values);
   }
 

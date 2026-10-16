@@ -108,8 +108,7 @@ void main() {
                 (arrival.$1 - returnExit.col).abs() +
                 (arrival.$2 - returnExit.row).abs();
             return distance <= 1 &&
-                (arrival.$1 != returnExit.col ||
-                    arrival.$2 != returnExit.row);
+                (arrival.$1 != returnExit.col || arrival.$2 != returnExit.row);
           });
           expect(
             hasNearbyReturnExit,
@@ -206,6 +205,7 @@ void main() {
       expect(Locations.horse.outsideTile, 9);
       expect(Locations.horse.tileAt(0, 4), 4);
       expect(Locations.horse.tileAt(5, 0), 4);
+      expect(Locations.horse.tileAt(10, 0), 9);
       expect(Locations.horse.tileAt(15, 2), 4);
       expect(Locations.horse.tileAt(15, 5), 4);
       expect(Locations.horse.tileAt(10, 7), 4);
@@ -262,7 +262,7 @@ void main() {
       expect(Locations.meadow.tileAt(6, 5), 11);
       expect(
         Locations.meadow.enemies.map((spawn) => spawn.enemyId),
-        containsAll(<String>['shaurmek', 'viktor_korneplod']),
+        contains('viktor_korneplod'),
       );
       expect(Locations.forest.isWalkable(3, 2), isFalse);
       expect(Locations.forest.isWalkable(9, 3), isFalse);

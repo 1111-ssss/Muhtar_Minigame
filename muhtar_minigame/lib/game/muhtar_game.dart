@@ -50,6 +50,7 @@ class MuhtarGame extends FlameGame
     onBattleStart: _startBattle,
     onNpcTalk: _talkToNpc,
     onPropSearch: _startPropSearch,
+    onPropInteract: _interactWithProp,
   );
 
   BattleEngine? battle;
@@ -519,6 +520,22 @@ class MuhtarGame extends FlameGame
     _movementKeyOrder.clear();
     registerWindowCloseHandler(overlaySearch, closeSearch);
     overlays.add(overlaySearch, priority: 10);
+  }
+
+  void _interactWithProp(LocationProp prop) {
+    final questId = prop.interactionId;
+    if (questId == null || _endingBattle || battle != null) return;
+
+    final progress = gameState.quest(questId);
+    if (progress?.state == QuestState.notStarted) {
+      if (!gameState.activateQuest(questId, propId: prop.id)) return;
+      notifications.notify(
+        'Задание принято: три ролика в раздевалке ВБ',
+        type: NotificationType.info,
+      );
+    }
+
+    if (questId == 'q_kartofla_videos') openVideoSequence();
   }
 
   void closeSearch() {

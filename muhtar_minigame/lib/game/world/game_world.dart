@@ -21,6 +21,7 @@ class GameWorld extends World {
     required this.onBattleStart,
     required this.onNpcTalk,
     this.onPropSearch,
+    this.onPropInteract,
   });
 
   final GameState gameState;
@@ -33,6 +34,9 @@ class GameWorld extends World {
   /// Колбэк оставлен необязательным, чтобы мир можно было загрузить отдельно
   /// от UI и подключить экран поиска позже.
   final void Function(LocationProp prop)? onPropSearch;
+
+  /// Вызывается, когда игрок подошёл к интерактивному пропу.
+  final void Function(LocationProp prop)? onPropInteract;
 
   /// Игрок живёт столько же, сколько мир: единственный экземпляр, который
   /// loadLocation лишь переперемещает. Это позволяет обращаться к нему
@@ -100,7 +104,11 @@ class GameWorld extends World {
         final prop = _pendingProp!;
         if (_isAdjacentToProp(prop)) {
           _pendingProp = null;
-          onPropSearch?.call(prop);
+          if (prop.interactionId != null) {
+            onPropInteract?.call(prop);
+          } else {
+            onPropSearch?.call(prop);
+          }
         }
       }
     }
@@ -130,7 +138,7 @@ class GameWorld extends World {
       location = Locations.byId(locationId) ?? Locations.meadow;
       _pathfinding = Pathfinding(location);
 
-      map = IsometricMap(location);
+      map = IsometricMap(location, propFilter: gameState.isPropVisible);
       await add(map);
 
       final requestedSpawn =
@@ -228,9 +236,10 @@ class GameWorld extends World {
       }
     }
 
-    // Тап по кусту или мусорному ведру — подходим к объекту и открываем
-    // отдельный поиск, когда игрок действительно оказался рядом.
-    final prop = _searchablePropAt(col, row);
+    // Тап по интерактивному объекту или кусту/мусорному ведру — подходим к
+    // объекту и вызываем соответствующее действие, когда игрок действительно
+    // оказался рядом.
+    final prop = _interactablePropAt(col, row);
     if (prop != null) {
       _approachToProp(prop);
       return;
@@ -381,7 +390,7 @@ class GameWorld extends World {
       }
     }
 
-    final prop = _searchablePropAt(target.$1, target.$2);
+    final prop = _interactablePropAt(target.$1, target.$2);
     if (prop != null) {
       _approachToProp(prop);
       return true;
@@ -434,9 +443,13 @@ class GameWorld extends World {
 
   bool isPlayerAdjacentToProp(LocationProp prop) => _isAdjacentToProp(prop);
 
-  LocationProp? _searchablePropAt(int col, int row) {
+  LocationProp? _interactablePropAt(int col, int row) {
     for (final prop in location.props) {
-      if (prop.searchable && prop.occupies(col, row)) return prop;
+      if ((prop.searchable || prop.interactionId != null) &&
+          gameState.isPropVisible(prop) &&
+          prop.occupies(col, row)) {
+        return prop;
+      }
     }
     return null;
   }

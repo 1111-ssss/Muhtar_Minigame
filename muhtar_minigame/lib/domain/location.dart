@@ -51,8 +51,9 @@ class LocationDef {
   /// карте, а [arrival] — необязательная точка появления на целевой карте.
   final List<LocationExit> exits;
 
-  /// Декоративные объекты мира. Объекты с [blocksMovement] участвуют в
-  /// коллизии так же, как стены и деревья, включая все клетки их размера.
+  /// Декоративные и интерактивные объекты мира. Объекты с [blocksMovement]
+  /// участвуют в коллизии так же, как стены и деревья, включая все клетки их
+  /// размера.
   final List<LocationProp> props;
 
   /// Визуальный тайл за пределами логической карты. Значение 5 означает
@@ -190,6 +191,7 @@ class LocationProp {
     this.variant = 0,
     this.searchable = false,
     this.specialItemId,
+    this.interactionId,
   }) : id = id ?? 'prop_${col}_$row';
 
   /// Стабильный id объекта, используемый поиском и сохранением прогресса.
@@ -211,6 +213,10 @@ class LocationProp {
 
   /// Особый предмет, который может находиться внутри объекта.
   final String? specialItemId;
+
+  /// Идентификатор действия, которое запускается при взаимодействии с объектом.
+  /// В отличие от [searchable], действие не открывает экран поиска.
+  final String? interactionId;
 
   bool occupies(int targetCol, int targetRow) =>
       targetCol >= col &&
