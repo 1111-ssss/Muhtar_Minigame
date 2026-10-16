@@ -373,7 +373,7 @@ class Locations {
     ],
     spawn: (8, 4),
     enemies: [EnemySpawn('shaurmek', 6, 4)],
-    npcs: [NpcSpawn('shaurmek', 'Шаурмек', 7, 2)],
+    npcs: [NpcSpawn('shaurmek', 'Шаурмек 2', 6, 3)],
     props: [
       LocationProp(
         id: 'doner_counter',
@@ -409,6 +409,7 @@ class Locations {
         row: 2,
         blocksMovement: false,
         variant: 1,
+        searchable: true,
       ),
     ],
     exits: [LocationExit(col: 0, row: 4, targetId: 'horse', arrival: (5, 1))],

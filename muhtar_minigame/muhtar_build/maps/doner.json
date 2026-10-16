@@ -23,9 +23,9 @@
   "npcs": [
     {
       "id": "shaurmek",
-      "name": "Шаурмек",
-      "col": 7,
-      "row": 2
+      "name": "Шаурмек 2",
+      "col": 6,
+      "row": 3
     }
   ],
   "additionalNpcs": [],
@@ -81,7 +81,7 @@
       "height": 1,
       "blocksMovement": false,
       "variant": 1,
-      "searchable": false
+      "searchable": true
     }
   ],
   "outsideTile": 5,

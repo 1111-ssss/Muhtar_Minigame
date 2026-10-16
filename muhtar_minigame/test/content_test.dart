@@ -134,9 +134,24 @@ void main() {
       contains('shaurmek'),
     );
     expect(Locations.doner.npcs.single.id, 'shaurmek');
+    expect(Locations.doner.npcs.single.name, 'Шаурмек 2');
+    expect(
+      Locations.doner.npcs.single.col - Locations.doner.enemies.single.col,
+      0,
+    );
+    expect(
+      Locations.doner.npcs.single.row - Locations.doner.enemies.single.row,
+      -1,
+    );
     expect(
       Locations.doner.props.map((prop) => prop.id),
       containsAll(<String>['doner_counter', 'doner_grill', 'doner_table']),
+    );
+    expect(
+      Locations.doner.props
+          .singleWhere((prop) => prop.id == 'doner_trash')
+          .searchable,
+      isTrue,
     );
     expect(Locations.college.npcs.single.id, 'ilya');
     expect(Locations.wb.npcs.single.id, 'wb_employee');
