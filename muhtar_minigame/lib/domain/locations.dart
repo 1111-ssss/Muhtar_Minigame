@@ -274,28 +274,6 @@ class Locations {
     ..._bridgeBankWithExit,
     4,
   ];
-  // ignore: unused_field, retained for old editor drafts.
-  static const _bridgeCollegeExit = _bridgeHorseExit;
-  static const _bridgeBankWithRightExit = <int>[
-    9,
-    9,
-    9,
-    9,
-    9,
-    9,
-    9,
-    9,
-    9,
-    9,
-    4,
-  ];
-  // ignore: unused_field, retained for old editor drafts.
-  static const _bridgeShopKopeechkaWithDorm = <int>[
-    ..._bridgeBank,
-    ..._bridgeDeck,
-    4,
-    ..._bridgeBankWithRightExit,
-  ];
   static const _bridgeShopCheburechnaya = <int>[
     ..._bridgeBank,
     ..._bridgeDeck,
