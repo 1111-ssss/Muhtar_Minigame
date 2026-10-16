@@ -40,6 +40,8 @@ class IsometricMap extends Component {
   }
 
   late final Image _tileImage;
+  late final List<LocationProp> _sortedProps;
+  final Paint _tilePaint = Paint()..filterQuality = FilterQuality.none;
   final TextPaint _exitLabel = TextPaint(
     style: const TextStyle(
       color: Color(0xFFD7E2FF),
@@ -51,6 +53,12 @@ class IsometricMap extends Component {
 
   @override
   Future<void> onLoad() async {
+    _sortedProps = [...location.props]
+      ..sort((a, b) {
+        final depth = _propDepth(b).compareTo(_propDepth(a));
+        if (depth != 0) return depth;
+        return _propLayer(a).compareTo(_propLayer(b));
+      });
     _tileImage = await _tileImageForStyle(_tileStyleKey(location));
   }
 
@@ -368,18 +376,12 @@ class IsometricMap extends Component {
           _tileImage,
           src,
           dst,
-          Paint()..filterQuality = FilterQuality.none,
+          _tilePaint,
         );
       }
     }
 
-    final props = [...location.props]
-      ..sort((a, b) {
-        final depth = _propCenter(b).y.compareTo(_propCenter(a).y);
-        if (depth != 0) return depth;
-        return _propLayer(a).compareTo(_propLayer(b));
-      });
-    for (final prop in props) {
+    for (final prop in _sortedProps) {
       _renderProp(canvas, prop);
     }
 
@@ -434,7 +436,7 @@ class IsometricMap extends Component {
           _tileImage,
           src,
           dst,
-          Paint()..filterQuality = FilterQuality.none,
+          _tilePaint,
         );
       }
     }
@@ -464,6 +466,11 @@ class IsometricMap extends Component {
     final row = prop.row.toDouble() + (prop.height - 1) / 2;
     return Vector2((col - row) * tileWidth / 2, (col + row) * tileHeight / 2);
   }
+
+  double _propDepth(LocationProp prop) =>
+      (prop.col + prop.row + (prop.width + prop.height - 2) / 2) *
+      tileHeight /
+      2;
 
   int _propLayer(LocationProp prop) =>
       prop.kind == LocationPropKind.platform ? 0 : 1;

@@ -603,12 +603,22 @@ class Locations {
   ];
 
   static final Map<String, LocationDef> _overrides = {};
+  static final Map<String, LocationDef> _builtInById = {
+    for (final location in builtIn) location.id: location,
+  };
+  static List<LocationDef>? _allCache;
 
   /// Applied MuhtarBuild maps replace built-ins by their stable IDs.
-  static List<LocationDef> get all => {
-    for (final location in builtIn) location.id: location,
-    ..._overrides,
-  }.values.toList(growable: false);
+  static List<LocationDef> get all {
+    final cached = _allCache;
+    if (cached != null) return cached;
+
+    final merged = <String, LocationDef>{
+      ..._builtInById,
+      ..._overrides,
+    };
+    return _allCache = List.unmodifiable(merged.values);
+  }
 
   static void replaceOverrides(Iterable<LocationDef> locations) {
     _overrides
@@ -616,14 +626,10 @@ class Locations {
       ..addEntries(
         locations.map((location) => MapEntry(location.id, location)),
       );
+    _allCache = null;
   }
 
-  static LocationDef? byId(String id) {
-    for (final loc in all) {
-      if (loc.id == id) return loc;
-    }
-    return null;
-  }
+  static LocationDef? byId(String id) => _overrides[id] ?? _builtInById[id];
 
   static LocationProp? propById(String id) {
     for (final location in all) {
