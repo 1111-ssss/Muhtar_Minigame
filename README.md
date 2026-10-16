@@ -71,11 +71,10 @@ make build
   пропуска нет, а закрытие сбрасывает последовательность. После финального
   ролика сразу открывается скин «Картофля».
 
-Перед запуском сюжетной сцены раздевалки положите файлы из пользовательской папки в
-`muhtar_minigame/assets/video/` с именами, перечисленными в
-[`assets/video/README.md`](muhtar_minigame/assets/video/README.md). Видеоплеер
-использует Flutter asset keys с URI `asset:///assets/video/...`, а не абсолютные
-пути. Для воспроизведения подключены `media_kit`, `media_kit_video` и
+Ролики сюжетной сцены раздевалки лежат в
+[`muhtar_minigame/assets/video/`](muhtar_minigame/assets/video/README.md).
+Видеоплеер использует Flutter asset keys с URI `asset:///assets/video/...`, а не
+абсолютные пути. Для воспроизведения подключены `media_kit`, `media_kit_video` и
 `media_kit_libs_video`, включая Linux/Windows; при отсутствии MP4 игра
 показывает graceful error и оставляет остальные сценарии доступными.
 
