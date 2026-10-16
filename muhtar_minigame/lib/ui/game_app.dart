@@ -60,13 +60,11 @@ class _GameAppState extends State<GameApp> with WidgetsBindingObserver {
       });
     }
     try {
-      // Карты читаются из asset bundle, а сохранение — с диска. Эти операции
-      // независимы, поэтому не заставляем одну ждать другую на старте.
-      final results = await Future.wait<dynamic>([
-        LocationAssets.load(),
-        _loadProgress(),
-      ]);
-      final saveDirectory = results[1] as String;
+      // Сначала применяем карты, затем читаем сохранение: fromJson проверяет
+      // searchable-пропы через реестр Locations. Параллельный запуск мог
+      // разобрать сейв раньше editor overrides и потерять валидные результаты.
+      await LocationAssets.load();
+      final saveDirectory = await _loadProgress();
 
       if (mounted) {
         setState(() => _loadStage = 'Прогрев первой карты…');
