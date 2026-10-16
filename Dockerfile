@@ -7,6 +7,8 @@ RUN apt-get update \
        ninja-build \
        pkg-config \
        libgtk-3-dev \
+       libmpv-dev \
+       libepoxy-dev \
        libasound2-dev \
        libpulse-dev \
        xvfb \
