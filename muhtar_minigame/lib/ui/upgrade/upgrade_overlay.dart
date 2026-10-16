@@ -69,7 +69,16 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
     }
   }
 
-  void _purchase(bool Function() action) {
+  void _purchase(String itemId) {
+    final purchased = widget.game.gameState.buyShopItem(itemId);
+    if (purchased && itemId == 'shaurma') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.game.openShawarmaChoice();
+      });
+    }
+  }
+
+  void _purchaseUpgrade(bool Function() action) {
     action();
   }
 
@@ -163,6 +172,7 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
                   ? switch (widget.shopNpcId) {
                       'baba_galya' => 'Магазин Бабы Гали',
                       'alenka' => 'Копеечка · магазин',
+                      'shaurmek' => 'Донер · магазин Шаурмека',
                       _ => 'Шоп Арианы',
                     }
                   : 'Инвентарь',
@@ -197,6 +207,7 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
                         state: state,
                         npcId: widget.shopNpcId ?? 'ariana',
                         onPurchase: _purchase,
+                        onUpgrade: _purchaseUpgrade,
                       ),
                       const SizedBox(height: 8),
                     ],
@@ -506,10 +517,12 @@ class _ShopGrid extends StatelessWidget {
     required this.state,
     required this.npcId,
     required this.onPurchase,
+    required this.onUpgrade,
   });
   final GameState state;
   final String npcId;
-  final void Function(bool Function()) onPurchase;
+  final ValueChanged<String> onPurchase;
+  final void Function(bool Function()) onUpgrade;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -537,7 +550,7 @@ class _ShopGrid extends StatelessWidget {
               _ShopItemPurchase(
                 item: item,
                 state: state,
-                onBuy: () => onPurchase(() => state.buyShopItem(item.id)),
+                onBuy: () => onPurchase(item.id),
               ),
           ],
         );
@@ -560,7 +573,7 @@ class _ShopGrid extends StatelessWidget {
             icon: Icons.inventory_2_outlined,
             price: GameState.caseCost,
             onBuy: state.coins >= GameState.caseCost
-                ? () => onPurchase(state.buyCase)
+                ? () => onUpgrade(state.buyCase)
                 : null,
           ),
           _Purchase(
@@ -573,7 +586,7 @@ class _ShopGrid extends StatelessWidget {
             onBuy:
                 state.dicePerTurn < GameState.maxDicePerTurn &&
                     state.coins >= state.diceUpgradeCost
-                ? () => onPurchase(state.upgradeDicePerTurn)
+                ? () => onUpgrade(state.upgradeDicePerTurn)
                 : null,
           ),
           _Purchase(
@@ -585,7 +598,7 @@ class _ShopGrid extends StatelessWidget {
             onBuy:
                 state.rerollsPerRound < 6 &&
                     state.coins >= state.rerollUpgradeCost
-                ? () => onPurchase(state.upgradeRerolls)
+                ? () => onUpgrade(state.upgradeRerolls)
                 : null,
           ),
         ],
@@ -619,9 +632,10 @@ class _InventoryPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final itemEntries = state.items.entries.toList(growable: false);
     final itemCount = mergeMode
         ? visibleDice.length
-        : CaseType.values.length + visibleDice.length;
+        : CaseType.values.length + itemEntries.length + visibleDice.length;
     return _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -666,7 +680,8 @@ class _InventoryPanel extends StatelessWidget {
           Text(
             mergeMode
                 ? 'Выберите две одинаковые кости. Совместимые варианты подсвечены.'
-                : 'Кейсы отображаются первыми, затем кости — от высокого уровня к низкому.',
+                : 'Кейсы отображаются первыми, затем предметы и кости — '
+                      'от высокого уровня к низкому.',
             style: const TextStyle(color: Colors.white70, height: 1.35),
           ),
           const SizedBox(height: 16),
@@ -698,10 +713,18 @@ class _InventoryPanel extends StatelessWidget {
                     onOpen: () => onOpenCase(CaseType.values[item]),
                   );
                 }
-                final diceIndex =
-                    visibleDice[mergeMode
-                        ? item
-                        : item - CaseType.values.length];
+                final itemIndex = item - CaseType.values.length;
+                if (!mergeMode && itemIndex < itemEntries.length) {
+                  final entry = itemEntries[itemIndex];
+                  return _ItemInventoryTile(
+                    itemId: entry.key,
+                    count: entry.value,
+                  );
+                }
+                final dicePosition = mergeMode
+                    ? item
+                    : itemIndex - itemEntries.length;
+                final diceIndex = visibleDice[dicePosition];
                 return _DiceInventoryTile(
                   index: diceIndex,
                   dice: state.inventory[diceIndex],
@@ -976,6 +999,89 @@ class _DiceInventoryTile extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _ItemInventoryTile extends StatelessWidget {
+  const _ItemInventoryTile({required this.itemId, required this.count});
+
+  final String itemId;
+  final int count;
+
+  static String _titleFor(String itemId) => switch (itemId) {
+    'potato' => 'Картошка',
+    'sync_async' => 'SyncAsync',
+    'alpen_gold' => 'Альпен Гольд',
+    'shaurma' => 'Шаурма',
+    _ => itemId,
+  };
+
+  static String _descriptionFor(String itemId) => switch (itemId) {
+    'potato' => 'Найденный предмет',
+    'sync_async' => 'Найденный предмет',
+    'alpen_gold' => 'Предмет для задания',
+    'shaurma' => 'Предмет для задания',
+    _ => 'Предмет',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final title = _titleFor(itemId);
+    return Semantics(
+      label: '$title, количество $count',
+      child: Ink(
+        key: ValueKey('inventory-item-$itemId'),
+        padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF4A3B35), Color(0xFF28252D)],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFD18A4D)),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black38,
+              offset: Offset(2, 3),
+              blurRadius: 5,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.inventory_2_rounded,
+              size: 44,
+              color: Color(0xFFFFD18A),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '×$count',
+              style: const TextStyle(
+                color: Color(0xFFFFD18A),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              _descriptionFor(itemId),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 11, color: Colors.white60),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ArtifactPanel extends StatelessWidget {

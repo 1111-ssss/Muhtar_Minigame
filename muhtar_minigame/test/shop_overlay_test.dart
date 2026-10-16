@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:muhtar_minigame/domain/locations.dart';
 import 'package:muhtar_minigame/domain/quest.dart';
 import 'package:muhtar_minigame/game/muhtar_game.dart';
 import 'package:muhtar_minigame/game_logic/audio_service.dart';
@@ -77,9 +78,7 @@ void main() {
       expect(gameState.spendCoins(25), isTrue);
       await pumpAlenkaShop(tester);
 
-      final buyFinder = find.byKey(
-        const ValueKey('shop-buy-alpen_gold'),
-      );
+      final buyFinder = find.byKey(const ValueKey('shop-buy-alpen_gold'));
       expect(buyFinder, findsOneWidget);
       expect(tester.widget<FilledButton>(buyFinder).onPressed, isNull);
       expect(find.text('Сначала возьмите задание'), findsOneWidget);
@@ -105,6 +104,13 @@ void main() {
       expect(gameState.itemCount('alpen_gold'), 1);
       expect(gameState.hasPurchasedShopItem('alpen_gold'), isTrue);
       expect(find.text('Куплено'), findsOneWidget);
+      await tester.drag(find.byType(ListView).first, const Offset(0, -1000));
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('inventory-item-alpen_gold')),
+        findsOneWidget,
+      );
+      expect(find.text('Альпен Гольд'), findsOneWidget);
 
       final loaded = await saveAndLoad(tester);
       expect(loaded.quest('q_alpen_gold')!.state, QuestState.active);
@@ -119,24 +125,53 @@ void main() {
     },
   );
 
+  testWidgets('магазин показывает дефицит монет и полное здоровье Алёнки', (
+    tester,
+  ) async {
+    expect(gameState.spendCoins(45), isTrue);
+    expect(
+      gameState.activateQuest('q_alpen_gold', npcId: 'baba_galya'),
+      isTrue,
+    );
+    await pumpAlenkaShop(tester);
+
+    final buyFinder = find.byKey(const ValueKey('shop-buy-alpen_gold'));
+    expect(buyFinder, findsOneWidget);
+    expect(tester.widget<FilledButton>(buyFinder).onPressed, isNull);
+    expect(find.text('Не хватает монет: 20'), findsOneWidget);
+    expect(find.text('Здоровье полное'), findsOneWidget);
+    expect(gameState.itemCount('alpen_gold'), 0);
+  });
+
   testWidgets(
-    'магазин показывает дефицит монет и полное здоровье Алёнки',
+    'инвентарь показывает найденный предмет и убирает его после сдачи',
     (tester) async {
-      expect(gameState.spendCoins(45), isTrue);
+      final prop = Locations.ruins.props.singleWhere(
+        (candidate) => candidate.specialItemId == 'potato',
+      );
       expect(
-        gameState.activateQuest('q_alpen_gold', npcId: 'baba_galya'),
+        gameState.activateQuest('q_potato_bridge', npcId: 'wb_employee'),
         isTrue,
       );
-      await pumpAlenkaShop(tester);
+      for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
+        gameState.searchProp(prop.id);
+      }
 
-      final buyFinder = find.byKey(
-        const ValueKey('shop-buy-alpen_gold'),
+      await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: UpgradeOverlay(game))),
       );
-      expect(buyFinder, findsOneWidget);
-      expect(tester.widget<FilledButton>(buyFinder).onPressed, isNull);
-      expect(find.text('Не хватает монет: 20'), findsOneWidget);
-      expect(find.text('Здоровье полное'), findsOneWidget);
-      expect(gameState.itemCount('alpen_gold'), 0);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        find.byKey(const ValueKey('inventory-item-potato')),
+        findsOneWidget,
+      );
+      expect(find.text('Картошка'), findsOneWidget);
+      expect(find.text('×1'), findsOneWidget);
+
+      expect(gameState.completeDeliveryQuest('q_potato_bridge'), isTrue);
+      await tester.pump();
+      expect(find.byKey(const ValueKey('inventory-item-potato')), findsNothing);
     },
   );
 
@@ -153,9 +188,7 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 300));
 
-    final hotbarCard = find.byKey(
-      const ValueKey('shop-upgrade-hotbar'),
-    );
+    final hotbarCard = find.byKey(const ValueKey('shop-upgrade-hotbar'));
     expect(hotbarCard, findsOneWidget);
     expect(find.text('Хотбар: 1/3'), findsOneWidget);
 

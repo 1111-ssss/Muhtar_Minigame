@@ -25,10 +25,7 @@ class Locations {
     spawn: (7, 8),
     npcs: [NpcSpawn('ariana', 'Ариана', 2, 8)],
     exits: [LocationExit(col: 15, row: 6, targetId: 'forest', arrival: (1, 5))],
-    enemies: [
-      EnemySpawn('shaurmek', 10, 8),
-      EnemySpawn('viktor_korneplod', 13, 4),
-    ],
+    enemies: [EnemySpawn('viktor_korneplod', 13, 4)],
     props: [
       LocationProp(kind: LocationPropKind.tree, col: 1, row: 3, variant: 0),
       LocationProp(kind: LocationPropKind.tree, col: 13, row: 3, variant: 1),
@@ -99,6 +96,7 @@ class Locations {
         col: 19,
         row: 3,
         variant: 2,
+        blocksMovement: false,
         searchable: true,
         specialItemId: 'sync_async',
       ),
@@ -135,6 +133,105 @@ class Locations {
     0,
     0,
   ];
+  // ignore: unused_field, retained for old editor drafts.
+  static const _bridgeCenterExitEdge = <int>[
+    ..._bridgeBank,
+    7,
+    7,
+    7,
+    7,
+    4,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+  ];
+  // ignore: unused_field, retained for old editor drafts.
+  static const _bridgeCenterExitEdgeFixed = <int>[
+    ..._bridgeBank,
+    7,
+    7,
+    7,
+    7,
+    4,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    ..._bridgeBank,
+  ];
+  static const _bridgeRailingWithCenterExit = <int>[
+    7,
+    7,
+    7,
+    7,
+    4,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+  ];
+  // ignore: unused_field, retained for old editor drafts.
+  static const _bridgeCenterExitEdgeCorrect = <int>[
+    ..._bridgeBank,
+    ..._bridgeRailingWithCenterExit,
+    ..._bridgeBank,
+  ];
   static const _bridgeRailing = <int>[
     7,
     7,
@@ -153,14 +250,14 @@ class Locations {
     7,
     7,
   ];
-  static const _bridgeLand = <int>[
-    ..._bridgeBank,
-    ..._bridgeDeck,
-    ..._bridgeBank,
-  ];
   static const _bridgeEdge = <int>[
     ..._bridgeBank,
     ..._bridgeRailing,
+    ..._bridgeBank,
+  ];
+  static const _bridgeLand = <int>[
+    ..._bridgeBank,
+    ..._bridgeDeck,
     ..._bridgeBank,
   ];
   static const _bridgeLeftExit = <int>[
@@ -175,13 +272,13 @@ class Locations {
     ..._bridgeBankWithExit,
     4,
   ];
-  static const _bridgeShopKopeechka = <int>[
+  static const _bridgeShopCheburechnaya = <int>[
     ..._bridgeBank,
     ..._bridgeDeck,
     4,
     ..._bridgeBankWithExit,
   ];
-  static const _bridgeShopCheburechnaya = <int>[
+  static const _bridgeShopKopeechkaOriginal = <int>[
     ..._bridgeBank,
     ..._bridgeDeck,
     4,
@@ -199,7 +296,7 @@ class Locations {
       _bridgeHorseExit,
       _bridgeLeftExit,
       _bridgeLand,
-      _bridgeShopKopeechka,
+      _bridgeShopKopeechkaOriginal,
       _bridgeShopCheburechnaya,
       _bridgeEdge,
     ],
@@ -222,9 +319,25 @@ class Locations {
     ],
     spawn: (2, 3),
     npcs: [NpcSpawn('ribka', 'Рибка', 21, 3)],
+    props: [
+      LocationProp(kind: LocationPropKind.tree, col: 3, row: 1, variant: 0),
+      LocationProp(kind: LocationPropKind.tree, col: 7, row: 6, variant: 1),
+      LocationProp(kind: LocationPropKind.bush, col: 5, row: 2, variant: 0),
+      LocationProp(kind: LocationPropKind.bush, col: 10, row: 5, variant: 1),
+      LocationProp(
+        id: 'bridge_potato',
+        kind: LocationPropKind.rock,
+        col: 17,
+        row: 2,
+        blocksMovement: false,
+        searchable: true,
+        specialItemId: 'potato',
+        variant: 2,
+      ),
+    ],
     exits: [
       LocationExit(col: 0, row: 3, targetId: 'forest', arrival: (20, 5)),
-      LocationExit(col: 39, row: 2, targetId: 'horse', arrival: (1, 3)),
+      LocationExit(col: 39, row: 2, targetId: 'horse', arrival: (1, 4)),
       LocationExit(
         col: 28,
         row: 5,
@@ -242,21 +355,188 @@ class Locations {
     ],
   );
 
-  /// Небольшая площадка для телепорта «Конь».
+  /// Интерьер Донера: после боя Шаурмек остаётся за стойкой и открывает
+  /// задания на сборку шаурмы и магазин.
+  static const LocationDef doner = LocationDef(
+    id: 'doner',
+    name: 'Донер (шаурмечная)',
+    tiles: [
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1],
+      [1, 0, 0, 2, 2, 2, 2, 2, 0, 0, 0, 1],
+      [4, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    ],
+    spawn: (8, 4),
+    enemies: [EnemySpawn('shaurmek', 6, 4)],
+    npcs: [NpcSpawn('shaurmek', 'Шаурмек 2', 6, 3)],
+    props: [
+      LocationProp(
+        id: 'doner_counter',
+        kind: LocationPropKind.platform,
+        col: 5,
+        row: 1,
+        width: 4,
+        blocksMovement: false,
+        variant: 1,
+      ),
+      LocationProp(
+        id: 'doner_grill',
+        kind: LocationPropKind.platform,
+        col: 2,
+        row: 2,
+        width: 2,
+        blocksMovement: false,
+        variant: 2,
+      ),
+      LocationProp(
+        id: 'doner_table',
+        kind: LocationPropKind.bench,
+        col: 6,
+        row: 5,
+        width: 2,
+        blocksMovement: false,
+        variant: 1,
+      ),
+      LocationProp(
+        id: 'doner_trash',
+        kind: LocationPropKind.trashBin,
+        col: 10,
+        row: 2,
+        blocksMovement: false,
+        variant: 1,
+        searchable: true,
+      ),
+    ],
+    exits: [LocationExit(col: 0, row: 4, targetId: 'horse', arrival: (5, 1))],
+  );
+
+  /// Простая площадка Колледжа. Персонажи будут добавлены позже.
+  static const LocationDef college = LocationDef(
+    id: 'college',
+    name: 'Колледж',
+    tiles: [
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 2, 2, 2, 2, 2, 2, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 0, 0, 13, 0, 0, 0, 1],
+      [4, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    ],
+    spawn: (1, 5),
+    npcs: [NpcSpawn('ilya', 'Илья', 5, 3)],
+    exits: [LocationExit(col: 0, row: 5, targetId: 'horse', arrival: (14, 2))],
+  );
+
+  /// Простая площадка Общаги. Персонажи будут добавлены позже.
+  static const LocationDef dormitory = LocationDef(
+    id: 'dormitory',
+    name: 'Общага',
+    tiles: [
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 0, 10, 10, 0, 0, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 4],
+      [1, 0, 0, 13, 0, 0, 0, 13, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    ],
+    spawn: (8, 3),
+    exits: [LocationExit(col: 9, row: 3, targetId: 'horse', arrival: (14, 5))],
+  );
+
+  /// Площадка ВБ с сотрудником ПВЗ и интерактивной раздевалкой.
+  static const LocationDef wb = LocationDef(
+    id: 'wb',
+    name: 'ВБ',
+    tiles: [
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [4, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 0, 14, 0, 0, 0, 0, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    ],
+    spawn: (1, 2),
+    npcs: [NpcSpawn('wb_employee', 'Сотрудник ПВЗ', 6, 3)],
+    props: [
+      LocationProp(
+        id: 'wb_fitting_room',
+        kind: LocationPropKind.platform,
+        col: 3,
+        row: 4,
+        width: 3,
+        blocksMovement: false,
+        variant: 2,
+        interactionId: 'q_kartofla_videos',
+      ),
+    ],
+    exits: [LocationExit(col: 0, row: 2, targetId: 'horse', arrival: (10, 6))],
+  );
+
+  /// Расширенная площадка для телепорта «Конь» без водяной рамки.
   static const LocationDef horse = LocationDef(
     id: 'horse',
     name: 'Конь',
     tiles: [
-      [6, 6, 6, 6, 6, 6, 6, 6],
-      [6, 9, 9, 13, 9, 9, 9, 6],
-      [6, 9, 9, 9, 9, 13, 9, 6],
-      [4, 9, 9, 9, 9, 9, 9, 6],
-      [6, 9, 9, 9, 9, 9, 9, 6],
-      [6, 6, 6, 6, 6, 6, 6, 6],
+      [9, 9, 9, 9, 9, 4, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+      [9, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9],
+      [9, 9, 9, 0, 2, 2, 2, 2, 2, 2, 2, 0, 9, 9, 9, 4],
+      [9, 9, 9, 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 9, 9, 9],
+      [4, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9],
+      [9, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 4],
+      [9, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 9],
+      [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 4, 9, 9, 9, 9, 9],
     ],
-    outsideTile: 6,
-    spawn: (1, 3),
-    exits: [LocationExit(col: 0, row: 3, targetId: 'ruins', arrival: (38, 2))],
+    outsideTile: 9,
+    spawn: (3, 4),
+    props: [
+      LocationProp(kind: LocationPropKind.tree, col: 7, row: 1, variant: 1),
+      LocationProp(kind: LocationPropKind.tree, col: 11, row: 6, variant: 2),
+      LocationProp(
+        id: 'horse_search_bush',
+        kind: LocationPropKind.bush,
+        col: 9,
+        row: 3,
+        searchable: true,
+      ),
+    ],
+    exits: [
+      LocationExit(col: 0, row: 4, targetId: 'ruins', arrival: (39, 1)),
+      LocationExit(
+        col: 5,
+        row: 0,
+        targetId: 'doner',
+        arrival: (1, 4),
+        direction: ExitDirection.up,
+      ),
+      LocationExit(
+        col: 15,
+        row: 2,
+        targetId: 'college',
+        arrival: (1, 5),
+        direction: ExitDirection.right,
+      ),
+      LocationExit(
+        col: 15,
+        row: 5,
+        targetId: 'dormitory',
+        arrival: (8, 3),
+        direction: ExitDirection.right,
+      ),
+      LocationExit(
+        col: 10,
+        row: 7,
+        targetId: 'wb',
+        arrival: (1, 2),
+        direction: ExitDirection.down,
+      ),
+    ],
   );
 
   /// Небольшой интерьер Копеечки в здании у Моста.
@@ -355,17 +635,28 @@ class Locations {
     forest,
     ruins,
     horse,
+    doner,
+    college,
+    dormitory,
+    wb,
     kopeechka,
     cheburechnaya,
   ];
 
   static final Map<String, LocationDef> _overrides = {};
+  static final Map<String, LocationDef> _builtInById = {
+    for (final location in builtIn) location.id: location,
+  };
+  static List<LocationDef>? _allCache;
 
   /// Applied MuhtarBuild maps replace built-ins by their stable IDs.
-  static List<LocationDef> get all => {
-    for (final location in builtIn) location.id: location,
-    ..._overrides,
-  }.values.toList(growable: false);
+  static List<LocationDef> get all {
+    final cached = _allCache;
+    if (cached != null) return cached;
+
+    final merged = <String, LocationDef>{..._builtInById, ..._overrides};
+    return _allCache = List.unmodifiable(merged.values);
+  }
 
   static void replaceOverrides(Iterable<LocationDef> locations) {
     _overrides
@@ -373,14 +664,10 @@ class Locations {
       ..addEntries(
         locations.map((location) => MapEntry(location.id, location)),
       );
+    _allCache = null;
   }
 
-  static LocationDef? byId(String id) {
-    for (final loc in all) {
-      if (loc.id == id) return loc;
-    }
-    return null;
-  }
+  static LocationDef? byId(String id) => _overrides[id] ?? _builtInById[id];
 
   static LocationProp? propById(String id) {
     for (final location in all) {

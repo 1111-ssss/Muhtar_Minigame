@@ -27,7 +27,7 @@ void main() {
     final bridge = dialogue.nodeById('bridge')!;
     expect(briefing.text, contains('Шаурмек'));
     expect(briefing.text, contains('Виктор Корнеплод'));
-    expect(bridge.text, contains('Копеечку'));
+    expect(bridge.text, contains('Донер'));
     expect(bridge.text, contains('Мост'));
     expect(
       GameContent.enemyById('shaurmek')!.attackPhrases,
@@ -43,13 +43,21 @@ void main() {
     expect(GameContent.playerAttackPhrases, contains('Мы блогеры'));
   });
 
-  test('новые враги имеют архетипы и спавны на Вокзале', () {
+  test('новые враги имеют архетипы, а Шаурмек переехал в Донер', () {
     expect(GameContent.enemyById('gopnik')?.name, 'Гопник');
     expect(GameContent.enemyById('shaurmek')?.name, 'Шаурмек');
     expect(GameContent.enemyById('viktor_korneplod')?.name, 'Виктор Корнеплод');
     expect(
       Locations.meadow.enemies.map((spawn) => spawn.enemyId),
-      containsAll(<String>['shaurmek', 'viktor_korneplod']),
+      contains('viktor_korneplod'),
+    );
+    expect(
+      Locations.meadow.enemies.map((spawn) => spawn.enemyId),
+      isNot(contains('shaurmek')),
+    );
+    expect(
+      Locations.doner.enemies.map((spawn) => spawn.enemyId),
+      contains('shaurmek'),
     );
   });
 
@@ -86,6 +94,11 @@ void main() {
 
   test('новые NPC, квест и товары заведены в контенте', () {
     expect(Locations.cheburechnaya.npcs.single.id, 'baba_galya');
+    expect(Locations.cheburechnaya.name, 'Чебуречная');
+    expect(Locations.doner.name, 'Донер (шаурмечная)');
+    expect(Locations.college.name, 'Колледж');
+    expect(Locations.dormitory.name, 'Общага');
+    expect(Locations.wb.name, 'ВБ');
     expect(Locations.kopeechka.npcs.single.id, 'alenka');
     expect(GameContent.dialogueForNpc('baba_galya'), isNotNull);
     expect(GameContent.dialogueForNpc('alenka'), isNotNull);
@@ -116,6 +129,70 @@ void main() {
     expect(GameContent.dialogueForNpc('malek'), isNotNull);
     expect(GameContent.dialogueForNpc('ribka'), isNotNull);
     expect(GameContent.dialogueForNpc('sofia'), isNotNull);
+    expect(GameContent.dialogueForNpc('buber'), isNotNull);
+  });
+
+  test('Донер, Илья, ПВЗ и раздевалка ВБ соединены с новым контентом', () {
+    expect(
+      Locations.doner.enemies.map((spawn) => spawn.enemyId),
+      contains('shaurmek'),
+    );
+    expect(Locations.doner.npcs.single.id, 'shaurmek');
+    expect(Locations.doner.npcs.single.name, 'Шаурмек 2');
+    expect(
+      Locations.doner.npcs.single.col - Locations.doner.enemies.single.col,
+      0,
+    );
+    expect(
+      Locations.doner.npcs.single.row - Locations.doner.enemies.single.row,
+      -1,
+    );
+    expect(
+      Locations.doner.props.map((prop) => prop.id),
+      containsAll(<String>['doner_counter', 'doner_grill', 'doner_table']),
+    );
+    expect(
+      Locations.doner.props
+          .singleWhere((prop) => prop.id == 'doner_trash')
+          .searchable,
+      isTrue,
+    );
+    expect(Locations.college.npcs.single.id, 'ilya');
+    expect(Locations.wb.npcs.single.id, 'wb_employee');
+    final fittingRoom = Locations.wb.props.singleWhere(
+      (prop) => prop.id == 'wb_fitting_room',
+    );
+    expect(fittingRoom.interactionId, 'q_kartofla_videos');
+    expect(fittingRoom.kind, LocationPropKind.platform);
+    expect(Locations.builtIn, hasLength(10));
+    expect(Locations.horse.exits, hasLength(5));
+    expect(
+      Locations.ruins.props.any(
+        (prop) => prop.id == 'bridge_potato' && prop.specialItemId == 'potato',
+      ),
+      isTrue,
+    );
+    expect(
+      GameContent.shopItemsForNpc('shaurmek').single.requiredQuestId,
+      'q_shawarma_for_ilya',
+    );
+    expect(
+      GameContent.quests.map((quest) => quest.id),
+      containsAll(<String>[
+        'q_doner_classic',
+        'q_doner_spicy',
+        'q_doner_signature',
+        'q_shawarma_for_ilya',
+        'q_potato_bridge',
+        'q_kartofla_videos',
+      ]),
+    );
+    final videoQuest = GameContent.quests.firstWhere(
+      (quest) => quest.id == 'q_kartofla_videos',
+    );
+    expect(videoQuest.acceptanceNpcId, isNull);
+    expect(videoQuest.acceptancePropId, 'wb_fitting_room');
+    expect(GameContent.dialogueForNpc('wb_fitting_room'), isNull);
   });
 
   test(
@@ -157,5 +234,15 @@ void main() {
     expect(gopnik.burnDamage, 0);
     expect(gopnik.maxHp, 20);
     expect(gopnik.diceFaces, [1, 2, 2, 3, 3, 4]);
+  });
+
+  test('Бубер и София получили новые реплики', () {
+    final buber = GameContent.dialogueForNpc('buber')!.nodeById('greeting')!;
+    final sofia = GameContent.dialogueForNpc('sofia')!.nodeById('greeting')!;
+
+    expect(buber.text, contains('protected это доступ по паролю'));
+    expect(buber.text, contains('117 iq. как вам показатель?'));
+    expect(sofia.text, contains('витя умнее меня во многих сферах'));
+    expect(sofia.text, contains('вы все пешки моего фанфика'));
   });
 }

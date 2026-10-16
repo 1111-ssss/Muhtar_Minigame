@@ -21,6 +21,11 @@ void main() {
     expect(restored.props.length, original.props.length);
     expect(restored.props.first.id, original.props.first.id);
     expect(restored.validationErrors(), isEmpty);
+
+    final wb = BuildMapDocument.fromJson(
+      BuildMapDocument.fromLocation(Locations.wb).toJson(),
+    );
+    expect(wb.props.single.interactionId, 'q_kartofla_videos');
   });
 
   test('repository saves a custom draft and loads it back', () async {

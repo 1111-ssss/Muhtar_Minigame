@@ -229,11 +229,6 @@
       ],
       "enemies": [
         {
-          "enemyId": "shaurmek",
-          "col": 10,
-          "row": 8
-        },
-        {
           "enemyId": "viktor_korneplod",
           "col": 13,
           "row": 4
@@ -1162,7 +1157,7 @@
           "targetId": "horse",
           "arrival": [
             1,
-            3
+            4
           ],
           "direction": "auto"
         },
@@ -1187,7 +1182,64 @@
           "direction": "right"
         }
       ],
-      "props": [],
+      "props": [
+        {
+          "id": "ruins_tree_3_1",
+          "kind": "tree",
+          "col": 3,
+          "row": 1,
+          "width": 1,
+          "height": 1,
+          "blocksMovement": true,
+          "variant": 0,
+          "searchable": false
+        },
+        {
+          "id": "ruins_tree_7_6",
+          "kind": "tree",
+          "col": 7,
+          "row": 6,
+          "width": 1,
+          "height": 1,
+          "blocksMovement": true,
+          "variant": 1,
+          "searchable": false
+        },
+        {
+          "id": "ruins_bush_5_2",
+          "kind": "bush",
+          "col": 5,
+          "row": 2,
+          "width": 1,
+          "height": 1,
+          "blocksMovement": true,
+          "variant": 0,
+          "searchable": false
+        },
+        {
+          "id": "ruins_bush_10_5",
+          "kind": "bush",
+          "col": 10,
+          "row": 5,
+          "width": 1,
+          "height": 1,
+          "blocksMovement": true,
+          "variant": 1,
+          "searchable": false
+        },
+        {
+          "id": "bridge_potato",
+          "kind": "rock",
+          "col": 17,
+          "row": 2,
+          "width": 1,
+          "height": 1,
+          "blocksMovement": false,
+          "variant": 2,
+          "searchable": true,
+          "specialItemId": "potato"
+        }
+      ],
       "outsideTile": 6,
       "outsideGroundRegions": [
         {
@@ -1210,6 +1262,231 @@
       "format": 1,
       "id": "horse",
       "name": "Конь",
+      "tiles": [
+        [
+          9,
+          9,
+          9,
+          9,
+          9,
+          4,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9
+        ],
+        [
+          9,
+          9,
+          9,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          9,
+          9,
+          9,
+          9
+        ],
+        [
+          9,
+          9,
+          9,
+          0,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          0,
+          9,
+          9,
+          9,
+          4
+        ],
+        [
+          9,
+          9,
+          9,
+          0,
+          0,
+          0,
+          0,
+          13,
+          0,
+          0,
+          0,
+          0,
+          0,
+          9,
+          9,
+          9
+        ],
+        [
+          4,
+          9,
+          9,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          9,
+          9
+        ],
+        [
+          9,
+          9,
+          9,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          9,
+          9,
+          4
+        ],
+        [
+          9,
+          9,
+          9,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          9,
+          9,
+          9
+        ],
+        [
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          9,
+          4,
+          9,
+          9,
+          9,
+          9,
+          9
+        ]
+      ],
+      "spawn": [
+        3,
+        4
+      ],
+      "enemies": [],
+      "npcs": [],
+      "additionalNpcs": [],
+      "exits": [
+        {
+          "col": 0,
+          "row": 4,
+          "targetId": "ruins",
+          "arrival": [
+            39,
+            1
+          ],
+          "direction": "auto"
+        },
+        {
+          "col": 5,
+          "row": 0,
+          "targetId": "doner",
+          "arrival": [
+            1,
+            4
+          ],
+          "direction": "up"
+        },
+        {
+          "col": 15,
+          "row": 2,
+          "targetId": "college",
+          "arrival": [
+            1,
+            5
+          ],
+          "direction": "right"
+        },
+        {
+          "col": 15,
+          "row": 5,
+          "targetId": "dormitory",
+          "arrival": [
+            8,
+            3
+          ],
+          "direction": "right"
+        },
+        {
+          "col": 10,
+          "row": 7,
+          "targetId": "wb",
+          "arrival": [
+            1,
+            2
+          ],
+          "direction": "down"
+        }
+      ],
+      "props": [
+        {
+          "id": "horse_search_bush",
+          "kind": "bush",
+          "col": 9,
+          "row": 3,
+          "width": 1,
+          "height": 1,
+          "blocksMovement": true,
+          "variant": 0,
+          "searchable": true
+        }
+      ],
+      "outsideTile": 9,
+      "outsideGroundRegions": []
+    },
+    {
+      "format": 1,
+      "id": "doner",
+      "name": "Донер (шаурмечная)",
       "tiles": [
         [
           1,
@@ -1241,24 +1518,52 @@
         ],
         [
           1,
-          2,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1
+        ],
+        [
+          1,
+          0,
+          0,
           2,
           2,
           2,
           2,
           2,
           0,
-          3,
           0,
           0,
           1
         ],
         [
           4,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          1
+        ],
+        [
+          1,
           0,
           0,
           0,
-          3,
+          0,
           0,
           0,
           0,
@@ -1297,38 +1602,84 @@
         ]
       ],
       "spawn": [
-        1,
-        3
+        8,
+        4
       ],
-      "enemies": [],
-      "npcs": [],
+      "enemies": [
+        {
+          "enemyId": "shaurmek",
+          "col": 6,
+          "row": 4
+        }
+      ],
+      "npcs": [
+        {
+          "id": "shaurmek",
+          "name": "Шаурмек 2",
+          "col": 6,
+          "row": 3
+        }
+      ],
       "additionalNpcs": [],
       "exits": [
         {
           "col": 0,
-          "row": 3,
-          "targetId": "ruins",
+          "row": 4,
+          "targetId": "horse",
           "arrival": [
-            38,
-            2
+            5,
+            1
           ],
           "direction": "auto"
         }
       ],
       "props": [
         {
-          "id": "prop_6_2",
-          "kind": "bush",
+          "id": "doner_counter",
+          "kind": "platform",
+          "col": 5,
+          "row": 1,
+          "width": 4,
+          "height": 1,
+          "blocksMovement": false,
+          "variant": 1,
+          "searchable": false
+        },
+        {
+          "id": "doner_grill",
+          "kind": "platform",
+          "col": 2,
+          "row": 2,
+          "width": 2,
+          "height": 1,
+          "blocksMovement": false,
+          "variant": 2,
+          "searchable": false
+        },
+        {
+          "id": "doner_table",
+          "kind": "bench",
           "col": 6,
+          "row": 5,
+          "width": 2,
+          "height": 1,
+          "blocksMovement": false,
+          "variant": 1,
+          "searchable": false
+        },
+        {
+          "id": "doner_trash",
+          "kind": "trashBin",
+          "col": 10,
           "row": 2,
           "width": 1,
           "height": 1,
-          "blocksMovement": true,
-          "variant": 0,
+          "blocksMovement": false,
+          "variant": 1,
           "searchable": true
         }
       ],
-      "outsideTile": 6,
+      "outsideTile": 5,
       "outsideGroundRegions": []
     },
     {

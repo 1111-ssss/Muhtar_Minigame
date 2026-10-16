@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muhtar_minigame/domain/artifact.dart';
@@ -7,6 +8,21 @@ import 'package:muhtar_minigame/domain/game_content.dart';
 import 'package:muhtar_minigame/domain/locations.dart';
 import 'package:muhtar_minigame/domain/quest.dart';
 import 'package:muhtar_minigame/game_logic/game_state.dart';
+
+class _FixedRandom implements Random {
+  const _FixedRandom(this.value);
+
+  final int value;
+
+  @override
+  bool nextBool() => value.isEven;
+
+  @override
+  double nextDouble() => value == 0 ? 0 : 0.5;
+
+  @override
+  int nextInt(int max) => value % max;
+}
 
 void main() {
   group('GameState', () {
@@ -251,6 +267,82 @@ void main() {
       expect(state.completeDeliveryQuest('q_alpen_gold'), isFalse);
     });
 
+    test('шаурму нельзя купить без задания и победы над Шаурмеком', () {
+      final state = GameState();
+      expect(state.activateQuest('q_shawarma_for_ilya', npcId: 'ilya'), isTrue);
+      expect(state.buyShopItem('shaurma'), isFalse);
+
+      state.markEnemyDefeated('doner:shaurmek:6:4');
+      expect(state.buyShopItem('shaurma'), isTrue);
+      expect(state.hasItem('shaurma'), isTrue);
+      expect(state.hasPurchasedShopItem('shaurma'), isTrue);
+    });
+
+    test('выбор после покупки шаурмы меняет исход для Ильи', () {
+      final delivered = GameState();
+      delivered.activateQuest('q_shawarma_for_ilya', npcId: 'ilya');
+      delivered.markEnemyDefeated('doner:shaurmek:6:4');
+      delivered.buyShopItem('shaurma');
+      expect(delivered.resolveShawarmaChoice(eat: false), isTrue);
+      expect(delivered.shawarmaOutcome, 'forIlya');
+      expect(delivered.completeDeliveryQuest('q_shawarma_for_ilya'), isTrue);
+      expect(delivered.shawarmaOutcome, 'delivered');
+
+      final eaten = GameState();
+      eaten.activateQuest('q_shawarma_for_ilya', npcId: 'ilya');
+      eaten.markEnemyDefeated('doner:shaurmek:6:4');
+      eaten.buyShopItem('shaurma');
+      expect(eaten.resolveShawarmaChoice(eat: true), isTrue);
+      expect(eaten.shawarmaOutcome, 'eaten');
+      expect(eaten.hasItem('shaurma'), isFalse);
+      expect(eaten.quest('q_shawarma_for_ilya')!.state, QuestState.completed);
+    });
+
+    test(
+      'картошка на Мосту сохраняется, доставляется и исчезает навсегда',
+      () async {
+        final state = GameState();
+        final potato = Locations.ruins.props.singleWhere(
+          (prop) => prop.specialItemId == 'potato',
+        );
+        state.activateQuest('q_potato_bridge', npcId: 'wb_employee');
+        for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
+          state.searchProp(potato.id);
+        }
+
+        expect(state.hasItem('potato'), isTrue);
+        expect(state.searchResult(potato.id)!.itemId, 'potato');
+        expect(state.isPropVisible(potato), isFalse);
+
+        final directory = await Directory.systemTemp.createTemp(
+          'muhtar-potato-',
+        );
+        try {
+          await state.save(directory.path);
+          final loaded = GameState();
+          expect(await loaded.load(directory.path), isTrue);
+          expect(loaded.itemCount('potato'), 1);
+          expect(loaded.searchResult(potato.id)!.completed, isTrue);
+          expect(loaded.isPropVisible(potato), isFalse);
+
+          expect(loaded.completeDeliveryQuest('q_potato_bridge'), isTrue);
+          expect(loaded.hasItem('potato'), isFalse);
+          expect(loaded.isPropVisible(potato), isFalse);
+          expect(loaded.quest('q_potato_bridge')!.state, QuestState.completed);
+
+          await loaded.save(directory.path);
+          final delivered = GameState();
+          expect(await delivered.load(directory.path), isTrue);
+          expect(delivered.itemCount('potato'), 0);
+          expect(delivered.searchResult(potato.id)!.completed, isTrue);
+          expect(delivered.isPropVisible(potato), isFalse);
+          expect(delivered.completeDeliveryQuest('q_potato_bridge'), isFalse);
+        } finally {
+          await directory.delete(recursive: true);
+        }
+      },
+    );
+
     test(
       'выполненное задание получает награду и больше не показывается активным',
       () {
@@ -351,10 +443,44 @@ void main() {
       expect(state.itemCount('sync_async'), 1);
       expect(state.searchProp(prop.id).itemId, 'sync_async');
       expect(state.itemCount('sync_async'), 1);
+      expect(state.isPropVisible(prop), isFalse);
 
       final loaded = GameState()..fromJson(state.toJson());
       expect(loaded.searchProp(prop.id).itemId, 'sync_async');
       expect(loaded.itemCount('sync_async'), 1);
+      expect(loaded.isPropVisible(prop), isFalse);
+    });
+
+    test('обычный куст даёт маленькую находку или ничего', () {
+      final emptyState = GameState(random: const _FixedRandom(0));
+      final emptyProp = Locations.horse.props.singleWhere(
+        (prop) => prop.searchable,
+      );
+      for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
+        emptyState.searchProp(emptyProp.id);
+      }
+      final empty = emptyState.searchResult(emptyProp.id)!;
+      expect(empty.rewardType, SearchRewardType.none);
+      expect(empty.amount, 0);
+      expect(emptyState.isPropVisible(emptyProp), isTrue);
+
+      final hpState = GameState(random: const _FixedRandom(1));
+      for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
+        hpState.searchProp(emptyProp.id);
+      }
+      expect(hpState.searchResult(emptyProp.id)!.amount, 1);
+      expect(hpState.playerHp, 30);
+
+      final coinState = GameState(random: const _FixedRandom(2));
+      for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
+        coinState.searchProp(emptyProp.id);
+      }
+      expect(
+        coinState.searchResult(emptyProp.id)!.rewardType,
+        SearchRewardType.coins,
+      );
+      expect(coinState.searchResult(emptyProp.id)!.amount, 5);
+      expect(coinState.coins, 55);
     });
 
     test(

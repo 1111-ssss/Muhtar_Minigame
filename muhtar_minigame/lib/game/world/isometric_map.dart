@@ -14,14 +14,26 @@ import '../../domain/locations.dart';
 /// компонент отвечает только за согласованное преобразование сетки в мир и
 /// обратно. Поэтому A* и коллизии не зависят от угла обзора камеры.
 class IsometricMap extends Component {
-  IsometricMap(this.location) : super(priority: 0);
+  IsometricMap(this.location, {this.propFilter}) : super(priority: 0);
 
   final LocationDef location;
+
+  /// Динамический фильтр декоративных объектов. Он вызывается во время
+  /// отрисовки, поэтому карта сразу отражает изменения GameState без
+  /// пересоздания Flame-компонента.
+  final bool Function(LocationProp prop)? propFilter;
 
   /// Полный размер ромба. Умеренная высота оставляет карту читаемой и не
   /// превращает её в «алмаз» с углом 45°.
   static const double tileWidth = 80;
   static const double tileHeight = 40;
+
+  /// Тайлы одинакового визуального стиля переиспользуются между картами.
+  /// Раньше новый tile sheet создавался при каждом переходе, поэтому первый
+  /// переход после запуска одновременно запускал растеризацию и отрисовку
+  /// новой карты.
+  static final Map<String, Image> _tileImageCache = {};
+  static final Map<String, Future<Image>> _tileImageLoads = {};
 
   /// Проецирует точку локального квадратного тайла в его изометрический
   /// ромб. `u` идёт вдоль `(col + 1, row)`, `v` — вдоль `(col, row + 1)`.
@@ -33,6 +45,8 @@ class IsometricMap extends Component {
   }
 
   late final Image _tileImage;
+  late final List<LocationProp> _sortedProps;
+  final Paint _tilePaint = Paint()..filterQuality = FilterQuality.none;
   final TextPaint _exitLabel = TextPaint(
     style: const TextStyle(
       color: Color(0xFFD7E2FF),
@@ -44,27 +58,70 @@ class IsometricMap extends Component {
 
   @override
   Future<void> onLoad() async {
-    _tileImage = await _generateTileSheet();
+    _sortedProps = [...location.props]
+      ..sort((a, b) {
+        final depth = _propDepth(b).compareTo(_propDepth(a));
+        if (depth != 0) return depth;
+        return _propLayer(a).compareTo(_propLayer(b));
+      });
+    _tileImage = await _tileImageForStyle(_tileStyleKey(location));
+  }
+
+  /// Прогревает tile sheet до появления игрового экрана. Это переносит
+  /// дорогой первый [Picture.toImage] на splash, а не на первый телепорт.
+  static Future<void> precache(LocationDef location) async {
+    await _tileImageForStyle(_tileStyleKey(location));
+  }
+
+  static String _tileStyleKey(LocationDef location) {
+    if (location.id == 'kopeechka' || location.id == 'cheburechnaya') {
+      return 'shop';
+    }
+    return switch (location.id) {
+      'meadow' => 'meadow',
+      'ruins' => 'ruins',
+      _ => 'grass',
+    };
+  }
+
+  static Future<Image> _tileImageForStyle(String style) async {
+    final cached = _tileImageCache[style];
+    if (cached != null) return cached;
+
+    final pending = _tileImageLoads[style];
+    if (pending != null) return pending;
+
+    final load = _generateTileSheet(style);
+    _tileImageLoads[style] = load;
+    try {
+      final image = await load;
+      _tileImageCache[style] = image;
+      return image;
+    } finally {
+      if (identical(_tileImageLoads[style], load)) {
+        _tileImageLoads.remove(style);
+      }
+    }
   }
 
   /// Генерирует горизонтальную полоску из ромбовидных тайлов. Тайл 5 —
   /// прозрачная пустота, 6 — вода, 7 — серый приподнятый край моста,
   /// 9 — плоская земля берегов, 13 — травяная площадка.
-  Future<Image> _generateTileSheet() async {
+  static Future<Image> _generateTileSheet(String style) async {
     final pictureRecorder = PictureRecorder();
     final canvas = Canvas(pictureRecorder);
     const w = tileWidth;
     const h = tileHeight;
     final colors = [
-      location.id == 'kopeechka' || location.id == 'cheburechnaya'
+      style == 'shop'
           ? const Color(0xFF767C82)
-          : switch (location.id) {
+          : switch (style) {
               'meadow' => const Color(0xFF9A8062),
               'ruins' => const Color(0xFF807E78),
               _ => const Color(0xFF4C9A4C),
             }, // 0 пол/трава
       const Color(0xFF6B5A4A), // 1 стена
-      location.id == 'kopeechka' || location.id == 'cheburechnaya'
+      style == 'shop'
           ? const Color(0xFF8B9094)
           : const Color(0xFFC8A872), // 2 дорога / серый пол магазина
       const Color(0xFF2E7D32), // 3 лесная кромка
@@ -320,22 +377,12 @@ class IsometricMap extends Component {
           tileWidth,
           tileHeight,
         );
-        canvas.drawImageRect(
-          _tileImage,
-          src,
-          dst,
-          Paint()..filterQuality = FilterQuality.none,
-        );
+        canvas.drawImageRect(_tileImage, src, dst, _tilePaint);
       }
     }
 
-    final props = [...location.props]
-      ..sort((a, b) {
-        final depth = _propCenter(b).y.compareTo(_propCenter(a).y);
-        if (depth != 0) return depth;
-        return _propLayer(a).compareTo(_propLayer(b));
-      });
-    for (final prop in props) {
+    for (final prop in _sortedProps) {
+      if (propFilter != null && !propFilter!(prop)) continue;
       _renderProp(canvas, prop);
     }
 
@@ -386,12 +433,7 @@ class IsometricMap extends Component {
           tileWidth,
           tileHeight,
         );
-        canvas.drawImageRect(
-          _tileImage,
-          src,
-          dst,
-          Paint()..filterQuality = FilterQuality.none,
-        );
+        canvas.drawImageRect(_tileImage, src, dst, _tilePaint);
       }
     }
   }
@@ -421,6 +463,11 @@ class IsometricMap extends Component {
     return Vector2((col - row) * tileWidth / 2, (col + row) * tileHeight / 2);
   }
 
+  double _propDepth(LocationProp prop) =>
+      (prop.col + prop.row + (prop.width + prop.height - 2) / 2) *
+      tileHeight /
+      2;
+
   int _propLayer(LocationProp prop) =>
       prop.kind == LocationPropKind.platform ? 0 : 1;
 
@@ -428,6 +475,16 @@ class IsometricMap extends Component {
     final position = _propCenter(prop);
     final paint = Paint()..isAntiAlias = false;
     canvas.save();
+    if (prop.specialItemId == 'potato') {
+      _renderPotatoProp(canvas, position, paint);
+      canvas.restore();
+      return;
+    }
+    if (prop.id == 'wb_fitting_room') {
+      _renderFittingRoom(canvas, prop);
+      canvas.restore();
+      return;
+    }
     switch (prop.kind) {
       case LocationPropKind.tree:
         final treeVariant = prop.variant % 3;
@@ -575,6 +632,38 @@ class IsometricMap extends Component {
         _renderTrashBin(canvas, position, prop.variant);
     }
     canvas.restore();
+  }
+
+  void _renderPotatoProp(Canvas canvas, Vector2 position, Paint paint) {
+    paint.color = const Color(0x550F1A12);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(position.x + 2, position.y + 7),
+        width: 30,
+        height: 10,
+      ),
+      paint,
+    );
+    paint.color = const Color(0xFFC98A4B);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(position.x, position.y - 8),
+        width: 26,
+        height: 20,
+      ),
+      paint,
+    );
+    paint.color = const Color(0xFFE3B56C);
+    canvas.drawRect(
+      Rect.fromLTWH(position.x - 7, position.y - 12, 4, 3),
+      paint,
+    );
+    canvas.drawRect(Rect.fromLTWH(position.x + 5, position.y - 4, 3, 3), paint);
+    paint.color = const Color(0xFF5D3D2A);
+    canvas.drawRect(
+      Rect.fromLTWH(position.x - 3, position.y - 16, 3, 3),
+      paint,
+    );
   }
 
   /// Визуальный городской мусорный бак. Он остаётся декоративным даже если
@@ -879,6 +968,96 @@ class IsometricMap extends Component {
       color: light,
       edgeColor: dark,
       thickness: 4,
+    );
+  }
+
+  void _renderFittingRoom(Canvas canvas, LocationProp prop) {
+    // The fitting room is a prop rather than a person: a small booth with a
+    // raised floor, two posts, and a curtain. Keeping it in the map layer
+    // makes the interaction visible without adding an NPC spawn.
+    for (var col = prop.col; col < prop.col + prop.width; col++) {
+      _drawPrismTile(
+        canvas,
+        baseCenter: tileToWorld(col, prop.row),
+        topColor: const Color(0xFFB9A5C8),
+        side: const Color(0xFF685A78),
+        end: const Color(0xFF89779B),
+        lift: -7,
+      );
+    }
+
+    final leftPost = _propPoint(prop, .18, 0, lift: -12);
+    final rightPost = _propPoint(
+      prop,
+      prop.width.toDouble() - .18,
+      0,
+      lift: -12,
+    );
+    final leftTop = leftPost.translate(0, -48);
+    final rightTop = rightPost.translate(0, -48);
+    final wall = Path()
+      ..moveTo(leftPost.dx, leftPost.dy)
+      ..lineTo(rightPost.dx, rightPost.dy)
+      ..lineTo(rightTop.dx, rightTop.dy)
+      ..lineTo(leftTop.dx, leftTop.dy)
+      ..close();
+    canvas.drawPath(
+      wall,
+      Paint()
+        ..color = const Color(0xFF7B4E8E)
+        ..isAntiAlias = false,
+    );
+    canvas.drawLine(
+      leftTop,
+      rightTop,
+      Paint()
+        ..color = const Color(0xFFE0B7EA)
+        ..strokeWidth = 4
+        ..isAntiAlias = false,
+    );
+    canvas.drawLine(
+      leftTop,
+      leftPost,
+      Paint()
+        ..color = const Color(0xFF3D294A)
+        ..strokeWidth = 5
+        ..isAntiAlias = false,
+    );
+    canvas.drawLine(
+      rightTop,
+      rightPost,
+      Paint()
+        ..color = const Color(0xFF3D294A)
+        ..strokeWidth = 5
+        ..isAntiAlias = false,
+    );
+
+    final curtainLeft = _propPoint(prop, .74, 0, lift: -12);
+    final curtainRight = _propPoint(
+      prop,
+      prop.width.toDouble() - .74,
+      0,
+      lift: -12,
+    );
+    final curtain = Path()
+      ..moveTo(curtainLeft.dx, curtainLeft.dy)
+      ..lineTo(curtainRight.dx, curtainRight.dy)
+      ..lineTo(curtainRight.dx, curtainRight.dy - 40)
+      ..lineTo(curtainLeft.dx, curtainLeft.dy - 40)
+      ..close();
+    canvas.drawPath(
+      curtain,
+      Paint()
+        ..color = const Color(0xFFD68BCB)
+        ..isAntiAlias = false,
+    );
+    canvas.drawLine(
+      curtainLeft.translate(0, -40),
+      curtainRight.translate(0, -40),
+      Paint()
+        ..color = const Color(0xFFFFD7F4)
+        ..strokeWidth = 3
+        ..isAntiAlias = false,
     );
   }
 

@@ -46,6 +46,8 @@ class GameState extends ChangeNotifier {
   final Map<Artifact, int> _artifacts = {};
   final Map<String, int> _items = {};
   final Set<String> _purchasedShopItems = {};
+  final Set<String> _defeatedEnemyAccess = {};
+  String? _shawarmaOutcome;
   List<Artifact> _pendingArtifactChoices = [];
   final Random _random;
   final Set<String> _ownedSkinIds = {};
@@ -83,6 +85,9 @@ class GameState extends ChangeNotifier {
   bool hasItem(String itemId) => itemCount(itemId) > 0;
   bool hasPurchasedShopItem(String itemId) =>
       _purchasedShopItems.contains(itemId);
+
+  /// Результат сценки после покупки шаурмы: `eaten` или `delivered`.
+  String? get shawarmaOutcome => _shawarmaOutcome;
 
   List<PlayerSkin> get ownedSkins => [
     for (final skin in GameContent.skinCatalog)
@@ -127,6 +132,17 @@ class GameState extends ChangeNotifier {
 
   SearchResult? searchResult(String propId) => _searchResults[propId];
 
+  /// Возвращает, должен ли проп оставаться видимым и доступным для поиска.
+  ///
+  /// Обычные поисковые объекты можно исследовать снова по старому правилу
+  /// игры. Объект с [LocationProp.specialItemId] — одноразовый: успешный
+  /// поиск фиксируется в [searchResult] и скрывает его навсегда, независимо от
+  /// того, находится предмет ещё в инвентаре или уже был передан по квесту.
+  bool isPropVisible(LocationProp prop) {
+    if (prop.specialItemId == null) return true;
+    return _searchResults[prop.id]?.completed != true;
+  }
+
   /// Цена следующего места в хотбаре.
   int get diceUpgradeCost => 35 + (dicePerTurn - 1) * 25;
   int get rerollUpgradeCost => 25 + (rerollsPerRound - 1) * 20;
@@ -136,6 +152,20 @@ class GameState extends ChangeNotifier {
   bool isEnemyDefeated(String spawnKey) {
     final remaining = enemyRespawnRemaining(spawnKey);
     return remaining != null;
+  }
+
+  /// Проверяет победу над конкретным врагом в конкретной локации.
+  /// Координаты не нужны снаружи: достаточно любого живого таймера
+  /// возрождения этого архетипа.
+  bool hasDefeatedEnemyAt(String locationId, String enemyId) {
+    if (_defeatedEnemyAccess.contains('$locationId:$enemyId')) return true;
+    final prefix = '$locationId:$enemyId:';
+    for (final key in _enemyRespawnAt.keys.toList()) {
+      if (key.startsWith(prefix) && enemyRespawnRemaining(key) != null) {
+        return true;
+      }
+    }
+    return false;
   }
 
   Duration? enemyRespawnRemaining(String spawnKey) {
@@ -294,7 +324,8 @@ class GameState extends ChangeNotifier {
       npcId == 'elder' ||
       npcId == 'ariana' ||
       npcId == 'baba_galya' ||
-      npcId == 'alenka';
+      npcId == 'alenka' ||
+      (npcId == 'shaurmek' && hasDefeatedEnemyAt('doner', 'shaurmek'));
 
   bool canBuyShopItem(String itemId) {
     final item = GameContent.shopItemById(itemId);
@@ -304,6 +335,13 @@ class GameState extends ChangeNotifier {
     final requiredQuest = item.requiredQuestId;
     if (requiredQuest != null &&
         quest(requiredQuest)?.state != QuestState.active) {
+      return false;
+    }
+    final requiredEnemy = item.requiredEnemyId;
+    final requiredLocation = item.requiredLocationId;
+    if (requiredEnemy != null &&
+        requiredLocation != null &&
+        !hasDefeatedEnemyAt(requiredLocation, requiredEnemy)) {
       return false;
     }
     if (item.effect == ShopEffect.heal && playerHp >= playerMaxHp) return false;
@@ -324,6 +362,7 @@ class GameState extends ChangeNotifier {
       case ShopEffect.addItem:
         final itemKey = item.itemId ?? item.id;
         _items[itemKey] = itemCount(itemKey) + 1;
+        progressQuests(itemId: itemKey, notify: false);
       case ShopEffect.damage:
         _playerHp = (_playerHp - item.amount).clamp(0, playerMaxHp).toInt();
     }
@@ -382,6 +421,10 @@ class GameState extends ChangeNotifier {
   void markEnemyDefeated(String spawnKey) {
     _defeatedEnemyKeys.add(spawnKey);
     _enemyRespawnAt[spawnKey] = DateTime.now().add(enemyRespawnDelay);
+    final parts = spawnKey.split(':');
+    if (parts.length >= 2) {
+      _defeatedEnemyAccess.add('${parts[0]}:${parts[1]}');
+    }
     notifyListeners();
   }
 
@@ -448,18 +491,30 @@ class GameState extends ChangeNotifier {
       );
     }
 
-    // Кейсы должны оставаться редкой находкой: обычный поиск чаще даёт
-    // небольшое лечение, монеты или опыт.
-    final rareRoll = _random.nextInt(100);
-    final reward = rareRoll < 2
-        ? (SearchRewardType.artifactCase, 1)
-        : rareRoll < 4
-        ? (SearchRewardType.diceCase, 1)
-        : switch (_random.nextInt(3)) {
-            0 => (SearchRewardType.hp, 5),
-            1 => (SearchRewardType.coins, 5),
-            _ => (SearchRewardType.xp, 5),
-          };
+    // В кустах добыча небольшая: иногда там вообще ничего нет, а если есть,
+    // это только +1 HP или +5 монет. Редкие кейсы и опыт остаются находками
+    // мусорных баков и других будущих searchable-объектов.
+    late final (SearchRewardType, int) reward;
+    if (prop.kind == LocationPropKind.bush) {
+      reward = switch (_random.nextInt(3)) {
+        0 => (SearchRewardType.none, 0),
+        1 => (SearchRewardType.hp, 1),
+        _ => (SearchRewardType.coins, 5),
+      };
+    } else {
+      // Кейсы должны оставаться редкой находкой: обычный поиск чаще даёт
+      // небольшое лечение, монеты или опыт.
+      final rareRoll = _random.nextInt(100);
+      reward = rareRoll < 2
+          ? (SearchRewardType.artifactCase, 1)
+          : rareRoll < 4
+          ? (SearchRewardType.diceCase, 1)
+          : switch (_random.nextInt(3)) {
+              0 => (SearchRewardType.hp, 5),
+              1 => (SearchRewardType.coins, 5),
+              _ => (SearchRewardType.xp, 5),
+            };
+    }
     switch (reward.$1) {
       case SearchRewardType.hp:
         _playerHp = (_playerHp + reward.$2).clamp(0, playerMaxHp).toInt();
@@ -489,15 +544,17 @@ class GameState extends ChangeNotifier {
 
   QuestProgress? quest(String id) => _quests[id];
 
-  bool canActivateQuest(String id, {String? npcId}) {
+  bool canActivateQuest(String id, {String? npcId, String? propId}) {
     final q = _quests[id];
     if (q == null || q.state != QuestState.notStarted) return false;
     final acceptanceNpcId = q.quest.acceptanceNpcId;
-    return acceptanceNpcId == null || acceptanceNpcId == npcId;
+    final acceptancePropId = q.quest.acceptancePropId;
+    return (acceptanceNpcId == null || acceptanceNpcId == npcId) &&
+        (acceptancePropId == null || acceptancePropId == propId);
   }
 
-  bool activateQuest(String id, {String? npcId}) {
-    if (!canActivateQuest(id, npcId: npcId)) return false;
+  bool activateQuest(String id, {String? npcId, String? propId}) {
+    if (!canActivateQuest(id, npcId: npcId, propId: propId)) return false;
     final q = _quests[id]!;
     q.state = QuestState.active;
     notifyListeners();
@@ -536,6 +593,11 @@ class GameState extends ChangeNotifier {
             changed = true;
           }
         case QuestType.deliverItem:
+          if (itemId != null && q.quest.itemId == itemId) {
+            q.progress = q.quest.target;
+            changed = true;
+          }
+        case QuestType.purchaseItem:
           if (itemId != null && q.quest.itemId == itemId) {
             q.progress = q.quest.target;
             changed = true;
@@ -591,6 +653,27 @@ class GameState extends ChangeNotifier {
     }
     progress.progress = progress.quest.target;
     progress.state = QuestState.completed;
+    if (id == 'q_shawarma_for_ilya') _shawarmaOutcome = 'delivered';
+    notifyListeners();
+    return true;
+  }
+
+  /// Фиксирует выбор после покупки шаурмы. Если герой съедает её, доставка
+  /// считается альтернативно завершённой и товар удаляется из инвентаря.
+  /// Если он оставляет её Илье, квест остаётся активным до разговора с Ильёй.
+  bool resolveShawarmaChoice({required bool eat}) {
+    final progress = _quests['q_shawarma_for_ilya'];
+    if (progress?.state != QuestState.active || !hasItem('shaurma')) {
+      return false;
+    }
+    if (eat) {
+      removeItem('shaurma');
+      progress!.progress = progress.quest.target;
+      progress.state = QuestState.completed;
+      _shawarmaOutcome = 'eaten';
+    } else {
+      _shawarmaOutcome = 'forIlya';
+    }
     notifyListeners();
     return true;
   }
@@ -641,6 +724,7 @@ class GameState extends ChangeNotifier {
       for (final entry in _artifacts.entries) entry.key.name: entry.value,
     },
     'items': Map<String, int>.from(_items),
+    'shawarmaOutcome': _shawarmaOutcome,
     'purchasedShopItems': _purchasedShopItems.toList(),
     'pendingArtifactChoices': [
       for (final artifact in _pendingArtifactChoices) artifact.name,
@@ -663,6 +747,7 @@ class GameState extends ChangeNotifier {
       for (final key in _defeatedEnemyKeys.toList())
         if (enemyRespawnRemaining(key) != null) key,
     ],
+    'defeatedEnemyAccess': _defeatedEnemyAccess.toList(),
     'enemyRespawns': {
       for (final key in _enemyRespawnAt.keys.toList())
         if (enemyRespawnRemaining(key) != null)
@@ -726,12 +811,21 @@ class GameState extends ChangeNotifier {
         if (count > 0) _items[entry.key.toString()] = count;
       }
     }
+    final shawarmaOutcome = json['shawarmaOutcome']?.toString();
+    _shawarmaOutcome =
+        const {'eaten', 'forIlya', 'delivered'}.contains(shawarmaOutcome)
+        ? shawarmaOutcome
+        : null;
     _purchasedShopItems
       ..clear()
       ..addAll(
         (json['purchasedShopItems'] as List?)?.whereType<String>() ?? const [],
       );
-    _currentLocationId = json['currentLocationId'] as String? ?? 'meadow';
+    final savedLocationId = json['currentLocationId'] as String?;
+    _currentLocationId =
+        savedLocationId != null && Locations.byId(savedLocationId) != null
+        ? savedLocationId
+        : 'meadow';
 
     _ownedSkinIds
       ..clear()
@@ -784,13 +878,23 @@ class GameState extends ChangeNotifier {
     final now = DateTime.now();
     _defeatedEnemyKeys = {};
     _enemyRespawnAt = {};
+    _defeatedEnemyAccess
+      ..clear()
+      ..addAll(
+        (json['defeatedEnemyAccess'] as List?)?.whereType<String>() ?? const [],
+      );
     final respawns = json['enemyRespawns'] as Map?;
     if (respawns != null) {
       for (final entry in respawns.entries) {
         final value = DateTime.tryParse(entry.value.toString());
         if (value != null && value.isAfter(now)) {
-          _defeatedEnemyKeys.add(entry.key.toString());
-          _enemyRespawnAt[entry.key.toString()] = value;
+          final key = entry.key.toString();
+          _defeatedEnemyKeys.add(key);
+          _enemyRespawnAt[key] = value;
+          final parts = key.split(':');
+          if (parts.length >= 2) {
+            _defeatedEnemyAccess.add('${parts[0]}:${parts[1]}');
+          }
         }
       }
     }
@@ -801,6 +905,10 @@ class GameState extends ChangeNotifier {
       if (_enemyRespawnAt.containsKey(key)) continue;
       _defeatedEnemyKeys.add(key);
       _enemyRespawnAt[key] = now.add(enemyRespawnDelay);
+      final parts = key.split(':');
+      if (parts.length >= 2) {
+        _defeatedEnemyAccess.add('${parts[0]}:${parts[1]}');
+      }
     }
 
     final diceJson = json['dice'] as List?;
@@ -864,6 +972,8 @@ class GameState extends ChangeNotifier {
     _cases.clear();
     _artifacts.clear();
     _items.clear();
+    _defeatedEnemyAccess.clear();
+    _shawarmaOutcome = null;
     _purchasedShopItems.clear();
     _pendingArtifactChoices = [];
     _ownedSkinIds

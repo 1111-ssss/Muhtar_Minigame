@@ -1,11 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../domain/location.dart';
 import '../../game_logic/game_state.dart';
 
-/// Самостоятельный экран поиска куста или мусорного ведра.
+/// Самостоятельный экран поиска объекта с карты.
 ///
 /// [game] — это [GameState], а не [MuhtarGame]: экран не знает о маршрутизации
 /// игры и подключается к ней одним внешним колбэком. Именованный [state] оставлен
@@ -61,7 +62,9 @@ class _SearchOverlayState extends State<SearchOverlay>
     super.initState();
     _result = _state.searchResult(widget.prop.id);
     _wasCompletedOnOpen =
-        widget.prop.kind == LocationPropKind.bush && _result?.completed == true;
+        _result?.completed == true &&
+        (widget.prop.kind == LocationPropKind.bush ||
+            widget.prop.specialItemId != null);
     _shakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 360),
@@ -104,6 +107,9 @@ class _SearchOverlayState extends State<SearchOverlay>
 
     final result = _result;
     final completed = result?.completed ?? false;
+    if (completed && result?.rewardType == SearchRewardType.none) {
+      return _buildEmptySearch();
+    }
     final colors = _palette(widget.prop.kind);
 
     return Material(
@@ -173,6 +179,7 @@ class _SearchOverlayState extends State<SearchOverlay>
                             shakeOffset: _shakeOffset,
                             shakeAngle: _shakeAngle,
                             colors: colors,
+                            specialItemId: widget.prop.specialItemId,
                             onTap: _search,
                           ),
                           const SizedBox(height: 16),
@@ -217,49 +224,147 @@ class _SearchOverlayState extends State<SearchOverlay>
     );
   }
 
-  Widget _buildAlreadySearched() => Material(
-    color: Colors.transparent,
-    child: Stack(
-      fit: StackFit.expand,
-      children: [
-        const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xE6131B2C), Color(0xF20A101C)],
-            ),
-          ),
-        ),
-        SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Здесь ничего нет...',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: widget.onClose,
-                    child: const Text('Закрыть'),
-                  ),
-                ],
+  Widget _buildAlreadySearched() {
+    if (_result?.rewardType == SearchRewardType.none) {
+      return _buildEmptySearch();
+    }
+    return Material(
+      color: Colors.transparent,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xE6131B2C), Color(0xF20A101C)],
               ),
             ),
           ),
-        ),
-      ],
+          SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Здесь ничего нет...',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: widget.onClose,
+                      child: const Text('Закрыть'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptySearch() => Focus(
+    autofocus: true,
+    onKeyEvent: _handleEmptyKey,
+    child: Material(
+      color: Colors.transparent,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xE6131B2C), Color(0xF20A101C)],
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF171D2B),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFF3F805C)),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x66000000),
+                        blurRadius: 20,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.grass_rounded,
+                          color: Color(0xFF8BE6A0),
+                          size: 30,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'В кусте ничего нет',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        const Text(
+                          'Поищи в другом месте.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white60, fontSize: 12),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: widget.onClose,
+                          child: const Text('Закрыть'),
+                        ),
+                        const Text(
+                          'Space / Enter / Esc',
+                          style: TextStyle(color: Colors.white38, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     ),
   );
+
+  KeyEventResult _handleEmptyKey(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent &&
+        (event.logicalKey == LogicalKeyboardKey.space ||
+            event.logicalKey == LogicalKeyboardKey.enter ||
+            event.logicalKey == LogicalKeyboardKey.numpadEnter ||
+            event.logicalKey == LogicalKeyboardKey.escape)) {
+      widget.onClose?.call();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
 
   static _SearchPalette _palette(LocationPropKind kind) {
     switch (kind) {
@@ -290,12 +395,15 @@ class _SearchOverlayState extends State<SearchOverlay>
     }
   }
 
-  static String _propLabel(LocationProp prop) => switch (prop.kind) {
-    LocationPropKind.bush => 'ЗАРОСЛИ',
-    LocationPropKind.trashBin => 'МУСОРНЫЙ БАК',
-    LocationPropKind.bench => 'СКАМЕЙКА',
-    _ => 'ОБЪЕКТ НА КАРТЕ',
-  };
+  static String _propLabel(LocationProp prop) {
+    if (prop.specialItemId == 'potato') return 'КАРТОШКА';
+    return switch (prop.kind) {
+      LocationPropKind.bush => 'ЗАРОСЛИ',
+      LocationPropKind.trashBin => 'МУСОРНЫЙ БАК',
+      LocationPropKind.bench => 'СКАМЕЙКА',
+      _ => 'ОБЪЕКТ НА КАРТЕ',
+    };
+  }
 }
 
 class _Header extends StatelessWidget {
@@ -353,6 +461,7 @@ class _IllustrationButton extends StatelessWidget {
     required this.shakeOffset,
     required this.shakeAngle,
     required this.colors,
+    required this.specialItemId,
     required this.onTap,
   });
 
@@ -363,6 +472,7 @@ class _IllustrationButton extends StatelessWidget {
   final Offset shakeOffset;
   final double shakeAngle;
   final _SearchPalette colors;
+  final String? specialItemId;
   final VoidCallback onTap;
 
   @override
@@ -370,6 +480,8 @@ class _IllustrationButton extends StatelessWidget {
     button: true,
     label: completed
         ? 'Найденная награда'
+        : prop.specialItemId == 'potato'
+        ? 'Осмотреть картошку'
         : 'Осмотреть ${prop.kind == LocationPropKind.trashBin ? 'мусорный бак' : 'куст'}',
     child: Material(
       color: Colors.transparent,
@@ -393,6 +505,7 @@ class _IllustrationButton extends StatelessWidget {
                     painter: _SearchPropPainter(
                       kind: prop.kind,
                       variant: prop.variant,
+                      specialItemId: specialItemId,
                       colors: colors,
                       pulse: shakeController.value,
                       reveal: reveal,
@@ -536,6 +649,7 @@ class _SearchPropPainter extends CustomPainter {
   const _SearchPropPainter({
     required this.kind,
     required this.variant,
+    required this.specialItemId,
     required this.colors,
     required this.pulse,
     required this.reveal,
@@ -543,6 +657,7 @@ class _SearchPropPainter extends CustomPainter {
 
   final LocationPropKind kind;
   final int variant;
+  final String? specialItemId;
   final _SearchPalette colors;
   final double pulse;
   final double reveal;
@@ -564,7 +679,9 @@ class _SearchPropPainter extends CustomPainter {
       paint,
     );
 
-    if (kind == LocationPropKind.trashBin) {
+    if (specialItemId == 'potato') {
+      _drawPotato(canvas, center, paint);
+    } else if (kind == LocationPropKind.trashBin) {
       _drawTrashBin(canvas, center, paint);
     } else {
       _drawBush(canvas, center, paint);
@@ -665,6 +782,59 @@ class _SearchPropPainter extends CustomPainter {
     );
   }
 
+  void _drawPotato(Canvas canvas, Offset center, Paint paint) {
+    // Картошка — отдельная находка, а не ещё один куст: крупный силуэт и
+    // тёплая палитра должны читаться даже до анимации раскрытия награды.
+    paint.color = const Color(0xFF3B241B);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(center.dx + 3, center.dy + 50),
+        width: 146,
+        height: 25,
+      ),
+      paint,
+    );
+    paint.color = const Color(0xFF9B5D32);
+    final potato = Path()
+      ..moveTo(center.dx - 58, center.dy + 16)
+      ..cubicTo(
+        center.dx - 66,
+        center.dy - 24,
+        center.dx - 32,
+        center.dy - 58,
+        center.dx + 4,
+        center.dy - 48,
+      )
+      ..cubicTo(
+        center.dx + 43,
+        center.dy - 60,
+        center.dx + 67,
+        center.dy - 23,
+        center.dx + 56,
+        center.dy + 17,
+      )
+      ..cubicTo(
+        center.dx + 41,
+        center.dy + 42,
+        center.dx - 35,
+        center.dy + 45,
+        center.dx - 58,
+        center.dy + 16,
+      )
+      ..close();
+    canvas.drawPath(potato, paint);
+    paint.color = const Color(0xFFD18A4D);
+    canvas.drawRect(
+      Rect.fromLTWH(center.dx - 31, center.dy - 22, 13, 7),
+      paint,
+    );
+    canvas.drawRect(Rect.fromLTWH(center.dx + 17, center.dy - 5, 10, 6), paint);
+    canvas.drawRect(Rect.fromLTWH(center.dx - 2, center.dy + 17, 9, 6), paint);
+    paint.color = const Color(0xFF5D3624);
+    canvas.drawRect(Rect.fromLTWH(center.dx - 8, center.dy - 36, 8, 7), paint);
+    canvas.drawRect(Rect.fromLTWH(center.dx + 31, center.dy + 11, 7, 6), paint);
+  }
+
   void _drawSparkles(Canvas canvas, Offset center, Paint paint) {
     paint.color = const Color(0xFFFFD27D).withValues(alpha: reveal);
     for (var i = 0; i < 7; i++) {
@@ -681,6 +851,7 @@ class _SearchPropPainter extends CustomPainter {
   bool shouldRepaint(covariant _SearchPropPainter oldDelegate) =>
       oldDelegate.kind != kind ||
       oldDelegate.variant != variant ||
+      oldDelegate.specialItemId != specialItemId ||
       oldDelegate.pulse != pulse ||
       oldDelegate.reveal != reveal;
 }

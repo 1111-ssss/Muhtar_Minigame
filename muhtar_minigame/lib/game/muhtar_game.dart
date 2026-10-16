@@ -50,6 +50,7 @@ class MuhtarGame extends FlameGame
     onBattleStart: _startBattle,
     onNpcTalk: _talkToNpc,
     onPropSearch: _startPropSearch,
+    onPropInteract: _interactWithProp,
   );
 
   BattleEngine? battle;
@@ -59,6 +60,8 @@ class MuhtarGame extends FlameGame
   bool _endingBattle = false;
   NpcEntity? _talkingNpc;
   LocationProp? _searchingProp;
+  String? _donerQuestId;
+  String? _donerRecipeId;
   String? activeShopNpcId;
 
   /// Оверлей остаётся смонтированным, чтобы fade не обрывался при смене фаз.
@@ -95,6 +98,9 @@ class MuhtarGame extends FlameGame
   static const overlayPreBattle = 'pre_battle';
   static const overlaySearch = 'search';
   static const overlaySongMiniGame = 'song_minigame';
+  static const overlayDonerAssembly = 'doner_assembly';
+  static const overlayVideoSequence = 'video_sequence';
+  static const overlayShawarmaChoice = 'shawarma_choice';
   static const overlayUpgrade = 'upgrade';
   static const overlayInventory = 'inventory';
   static const overlayQuests = 'quests';
@@ -235,6 +241,20 @@ class MuhtarGame extends FlameGame
         return KeyEventResult.handled;
       }
       if (event is KeyDownEvent &&
+          overlays.isActive(overlaySearch) &&
+          (event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.numpadEnter ||
+              event.logicalKey == LogicalKeyboardKey.space)) {
+        final result = _searchingProp == null
+            ? null
+            : gameState.searchResult(_searchingProp!.id);
+        if (result?.completed == true &&
+            result?.rewardType == SearchRewardType.none) {
+          closeSearch();
+          return KeyEventResult.handled;
+        }
+      }
+      if (event is KeyDownEvent &&
           overlays.isActive(overlayBattleConfirm) &&
           (event.logicalKey == LogicalKeyboardKey.enter ||
               event.logicalKey == LogicalKeyboardKey.numpadEnter ||
@@ -293,6 +313,9 @@ class MuhtarGame extends FlameGame
       overlayPreBattle,
       overlaySearch,
       overlaySongMiniGame,
+      overlayDonerAssembly,
+      overlayVideoSequence,
+      overlayShawarmaChoice,
       overlayBattle,
       overlaySettings,
     ];
@@ -378,10 +401,15 @@ class MuhtarGame extends FlameGame
       // сразу, иначе закрытие приложения во время перехода откатит задание.
       // Выполненные задания не забираются автоматически: награду должен
       // подтвердить игрок в журнале заданий.
-      await saveProgress();
+      // Даём Flutter сначала показать fade-out. Иначе синхронный jsonEncode
+      // внутри save() может задержать первый кадр перехода.
+      await Future<void>.delayed(Duration.zero);
       // Полный fade-out должен закончиться до того, как содержимое мира будет
       // заменено, иначе на один кадр видны старые сущности.
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await Future.wait<void>([
+        saveProgress(),
+        Future<void>.delayed(const Duration(milliseconds: 500)),
+      ]);
       final sourceId = gameState.currentLocationId;
       gameState.currentLocationId = exit.targetId;
       await world_.loadLocation(
@@ -494,6 +522,22 @@ class MuhtarGame extends FlameGame
     overlays.add(overlaySearch, priority: 10);
   }
 
+  void _interactWithProp(LocationProp prop) {
+    final questId = prop.interactionId;
+    if (questId == null || _endingBattle || battle != null) return;
+
+    final progress = gameState.quest(questId);
+    if (progress?.state == QuestState.notStarted) {
+      if (!gameState.activateQuest(questId, propId: prop.id)) return;
+      notifications.notify(
+        'Задание принято: три ролика в раздевалке ВБ',
+        type: NotificationType.info,
+      );
+    }
+
+    if (questId == 'q_kartofla_videos') openVideoSequence();
+  }
+
   void closeSearch() {
     _searchingProp = null;
     unregisterWindowCloseHandler(overlaySearch);
@@ -526,6 +570,104 @@ class MuhtarGame extends FlameGame
     );
     unawaited(saveProgress());
     closeSongMiniGame();
+  }
+
+  String? get donerQuestId => _donerQuestId;
+  String? get donerRecipeId => _donerRecipeId;
+
+  void openDonerAssembly({required String questId, required String recipeId}) {
+    final progress = gameState.quest(questId);
+    if (progress?.state != QuestState.active ||
+        overlays.isActive(overlayDonerAssembly)) {
+      return;
+    }
+    _donerQuestId = questId;
+    _donerRecipeId = recipeId;
+    world_.player.stop();
+    _pressedKeys.clear();
+    _movementKeyOrder.clear();
+    registerWindowCloseHandler(overlayDonerAssembly, closeDonerAssembly);
+    overlays.add(overlayDonerAssembly, priority: 20);
+  }
+
+  void closeDonerAssembly() {
+    _donerQuestId = null;
+    _donerRecipeId = null;
+    unregisterWindowCloseHandler(overlayDonerAssembly);
+    overlays.remove(overlayDonerAssembly);
+  }
+
+  void completeDonerAssembly() {
+    final questId = _donerQuestId;
+    final recipeId = _donerRecipeId;
+    if (questId == null || recipeId == null) return;
+    if (!gameState.completeMiniGameQuest(
+      questId,
+      miniGameId: 'doner_$recipeId',
+    )) {
+      return;
+    }
+    notifications.notify(
+      'Шаурма собрана! Награда уже ждёт в журнале заданий.',
+      type: NotificationType.reward,
+    );
+    unawaited(saveProgress());
+    closeDonerAssembly();
+  }
+
+  void openVideoSequence() {
+    final progress = gameState.quest('q_kartofla_videos');
+    if (progress?.state != QuestState.active ||
+        overlays.isActive(overlayVideoSequence)) {
+      return;
+    }
+    world_.player.stop();
+    _pressedKeys.clear();
+    _movementKeyOrder.clear();
+    registerWindowCloseHandler(overlayVideoSequence, closeVideoSequence);
+    overlays.add(overlayVideoSequence, priority: 30);
+  }
+
+  void closeVideoSequence() {
+    unregisterWindowCloseHandler(overlayVideoSequence);
+    overlays.remove(overlayVideoSequence);
+  }
+
+  void completeVideoSequence() {
+    if (!gameState.completeMiniGameQuest(
+      'q_kartofla_videos',
+      miniGameId: 'kartofla_videos',
+    )) {
+      return;
+    }
+    // Для этой награды нет отдельной кнопки «забрать»: скин выдаётся сразу
+    // после финального кадра всех трёх роликов.
+    gameState.claimQuest('q_kartofla_videos');
+    notifications.notify(
+      'Три ролика просмотрены! Скин «Картофля» разблокирован.',
+      type: NotificationType.reward,
+    );
+    unawaited(saveProgress());
+    closeVideoSequence();
+  }
+
+  void openShawarmaChoice() {
+    overlays.remove(overlayUpgrade);
+    registerWindowCloseHandler(overlayShawarmaChoice, () {});
+    overlays.add(overlayShawarmaChoice, priority: 40);
+  }
+
+  void chooseShawarma(bool eat) {
+    if (!gameState.resolveShawarmaChoice(eat: eat)) return;
+    unregisterWindowCloseHandler(overlayShawarmaChoice);
+    overlays.remove(overlayShawarmaChoice);
+    notifications.notify(
+      eat
+          ? 'Шаурма съедена. Илья узнает о твоём выборе.'
+          : 'Шаурма сохранена для Ильи.',
+      type: NotificationType.info,
+    );
+    unawaited(saveProgress());
   }
 
   void _beginBattle(EnemyEntity enemyEntity) {
@@ -747,6 +889,10 @@ class MuhtarGame extends FlameGame
     _clearBattleIntroOverlays();
     closeSearch();
     closeSongMiniGame();
+    closeDonerAssembly();
+    closeVideoSequence();
+    unregisterWindowCloseHandler(overlayShawarmaChoice);
+    overlays.remove(overlayShawarmaChoice);
     _pendingBattleEnemy = null;
     _victorPreBattleActive = false;
     battle = null;
@@ -774,6 +920,9 @@ class MuhtarGame extends FlameGame
       overlays.isActive(overlayDialog) ||
       overlays.isActive(overlaySearch) ||
       overlays.isActive(overlaySongMiniGame) ||
+      overlays.isActive(overlayDonerAssembly) ||
+      overlays.isActive(overlayVideoSequence) ||
+      overlays.isActive(overlayShawarmaChoice) ||
       overlays.isActive(overlayUpgrade) ||
       overlays.isActive(overlayInventory) ||
       overlays.isActive(overlayQuests) ||

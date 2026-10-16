@@ -186,7 +186,7 @@ void main() {
       battle.placeDie(attackIndex, 1);
       expect(
         battle.effectiveValueAt(1),
-        (battle.board[1]!.value + battle.board[4]!.value).clamp(1, 6),
+        battle.board[1]!.value + battle.board[4]!.value,
       );
       expect(battle.effectiveLevelAt(1), battle.board[1]!.dice.level);
       expect(
@@ -198,39 +198,88 @@ void main() {
     },
   );
 
-  test('upgrade меняет только выпавшее значение, а не уровень doctor', () {
-    const upgrade = Dice(
-      id: 'upgrade',
-      name: 'Улучшение',
-      baseFaces: [6],
-      ability: DiceAbility.upgrade,
-    );
-    const doctor = Dice(
-      id: 'doctor-3',
-      name: 'Доктор',
-      baseFaces: [1, 2, 3, 4, 5, 6],
-      level: 3,
-      ability: DiceAbility.doctor,
-    );
-    final battle = BattleEngine(
-      player: player(hp: 10, dice: const [upgrade, doctor]),
-      enemy: Fighter(name: 'Враг', maxHp: 30, attackFaces: const [0]),
-      random: const _MaxRandom(),
-      playerDiceCount: 2,
-    )..startTurn();
+  test(
+    'upgrade меняет выпавшее значение doctor, а не его постоянный уровень',
+    () {
+      const upgrade = Dice(
+        id: 'upgrade',
+        name: 'Улучшение',
+        baseFaces: [6],
+        ability: DiceAbility.upgrade,
+      );
+      const doctor = Dice(
+        id: 'doctor-3',
+        name: 'Доктор',
+        baseFaces: [1, 2, 3, 4, 5, 6],
+        level: 3,
+        ability: DiceAbility.doctor,
+      );
+      final battle = BattleEngine(
+        player: player(hp: 10, dice: const [upgrade, doctor]),
+        enemy: Fighter(name: 'Враг', maxHp: 30, attackFaces: const [0]),
+        random: const _MaxRandom(),
+        playerDiceCount: 2,
+      )..startTurn();
 
-    // _MaxRandom draws the doctor first and the upgrade second. Cell 4's
-    // level-1 zone includes cell 1.
-    expect(battle.placeDie(1, 4), isTrue);
-    expect(battle.placeDie(0, 1), isTrue);
-    expect(battle.board[1]!.dice.level, 3);
-    expect(battle.effectiveLevelAt(1), 3);
-    expect(battle.playerIntent.heal, 3);
+      // _MaxRandom draws the doctor first and the upgrade second. Cell 4's
+      // level-1 zone includes cell 1.
+      expect(battle.placeDie(1, 4), isTrue);
+      expect(battle.placeDie(0, 1), isTrue);
+      expect(battle.board[1]!.dice.level, 3);
+      expect(battle.effectiveLevelAt(1), 3);
+      expect(battle.playerIntent.heal, 12);
 
-    battle.endTurn();
+      battle.endTurn();
 
-    expect(battle.player.hp, 13);
-  });
+      expect(battle.player.hp, 22);
+    },
+  );
+
+  test(
+    'несколько костей улучшения складываются на одной ячейке без капа 6',
+    () {
+      const upgradeOne = Dice(
+        id: 'upgrade-one',
+        name: 'Улучшение',
+        baseFaces: [1, 2, 3, 4, 5, 6],
+        ability: DiceAbility.upgrade,
+      );
+      const upgradeTwo = Dice(
+        id: 'upgrade-two',
+        name: 'Улучшение',
+        baseFaces: [1, 2, 3, 4, 5, 6],
+        ability: DiceAbility.upgrade,
+      );
+      const attack = Dice(
+        id: 'attack',
+        name: 'Атака',
+        baseFaces: [1, 2, 3, 4, 5, 6],
+        ability: DiceAbility.warrior,
+      );
+      final battle = BattleEngine(
+        player: player(dice: const [upgradeOne, upgradeTwo, attack]),
+        enemy: enemy(),
+        playerDiceCount: 3,
+        random: const _MaxRandom(),
+      )..startTurn();
+
+      final upgradeIndexes = [
+        for (var index = 0; index < battle.hotbar.length; index++)
+          if (battle.hotbar[index]?.dice.ability == DiceAbility.upgrade) index,
+      ];
+      final attackIndex = battle.hotbar.indexWhere(
+        (die) => die?.dice.ability == DiceAbility.warrior,
+      );
+      expect(upgradeIndexes, hasLength(2));
+      expect(battle.placeDie(attackIndex, 1), isTrue);
+      expect(battle.placeDie(upgradeIndexes[0], 4), isTrue);
+      expect(battle.placeDie(upgradeIndexes[1], 0), isTrue);
+
+      expect(battle.board[1]!.value, 6);
+      expect(battle.effectiveValueAt(1), 18);
+      expect(battle.playerIntent.attack, 18);
+    },
+  );
 
   test('статы врага показывают его ожидаемую атаку', () {
     final battle = BattleEngine(player: player(), enemy: enemy())..startTurn();
@@ -240,7 +289,7 @@ void main() {
   });
 
   test(
-    'кость doctor уровня 3 лечит по уровню, а preview совпадает с фактом',
+    'кость doctor использует текущее выпавшее значение, а preview совпадает с фактом',
     () {
       final battle = BattleEngine(
         player: player(
@@ -261,12 +310,12 @@ void main() {
 
       expect(battle.hotbar.single!.value, 6);
       expect(battle.placeDie(0, 4), isTrue);
-      expect(battle.playerIntent.heal, 3);
-      expect(battle.previewFor(battle.player).healing, 3);
+      expect(battle.playerIntent.heal, 6);
+      expect(battle.previewFor(battle.player).healing, 6);
 
       battle.endTurn();
 
-      expect(battle.player.hp, 13);
+      expect(battle.player.hp, 16);
     },
   );
 
@@ -291,16 +340,16 @@ void main() {
 
     final battle = doctorBattle(10);
     expect(battle.placeDie(0, 4), isTrue);
-    expect(battle.playerIntent.heal, 7);
-    expect(battle.previewFor(battle.player).healing, 7);
+    expect(battle.playerIntent.heal, 8);
+    expect(battle.previewFor(battle.player).healing, 8);
 
     battle.endTurn();
 
-    expect(battle.player.hp, 17);
+    expect(battle.player.hp, 18);
 
     final cappedBattle = doctorBattle(29);
     expect(cappedBattle.placeDie(0, 4), isTrue);
-    expect(cappedBattle.playerIntent.heal, 7);
+    expect(cappedBattle.playerIntent.heal, 8);
     expect(cappedBattle.previewFor(cappedBattle.player).healing, 1);
 
     cappedBattle.endTurn();

@@ -76,7 +76,7 @@ void main() {
       expect(Locations.meadow.npcs.single.id, 'ariana');
     });
 
-    test('forest is rectangular and arrivals are next to return exits', () {
+    test('arrivals are beside, not on, return exits', () {
       expect(Locations.forest.cols, greaterThan(Locations.forest.rows));
 
       for (final location in Locations.all) {
@@ -94,13 +94,27 @@ void main() {
           if (arrival == null) continue;
           final target = Locations.byId(exit.targetId)!;
           if (target.exits.isEmpty) continue;
-          final returnExit = target.exits.firstWhere(
+          final returnExits = target.exits.where(
             (candidate) => candidate.targetId == location.id,
           );
           expect(
-            (arrival.$1 - returnExit.col).abs() +
-                (arrival.$2 - returnExit.row).abs(),
-            lessThanOrEqualTo(1),
+            target.exitAt(arrival.$1, arrival.$2),
+            isNull,
+            reason:
+                '${location.id} -> ${exit.targetId} must not land on a portal',
+          );
+          final hasNearbyReturnExit = returnExits.any((returnExit) {
+            final distance =
+                (arrival.$1 - returnExit.col).abs() +
+                (arrival.$2 - returnExit.row).abs();
+            return distance <= 1 &&
+                (arrival.$1 != returnExit.col || arrival.$2 != returnExit.row);
+          });
+          expect(
+            hasNearbyReturnExit,
+            isTrue,
+            reason:
+                '${location.id} -> ${exit.targetId} must arrive beside, not on, the return exit',
           );
         }
       }
@@ -116,13 +130,7 @@ void main() {
         Locations.ruins.tiles.first.take(12).every((tile) => tile == 9),
         isTrue,
       );
-      expect(
-        Locations.ruins.tiles.first
-            .skip(12)
-            .take(16)
-            .every((tile) => tile == 7),
-        isTrue,
-      );
+      expect(Locations.ruins.tiles.first.skip(12).take(16), everyElement(7));
       expect(
         Locations.ruins.tiles.first.skip(28).every((tile) => tile == 9),
         isTrue,
@@ -188,8 +196,23 @@ void main() {
       expect(Locations.ruins.exitAt(28, 6)?.targetId, 'cheburechnaya');
       expect(Locations.ruins.exitAt(28, 5)?.direction, ExitDirection.right);
       expect(Locations.ruins.exitAt(28, 6)?.direction, ExitDirection.right);
-      expect(Locations.horse.exits.single.targetId, 'ruins');
-      expect(Locations.horse.tileAt(0, 3), 4);
+      expect(
+        Locations.horse.exits.map((exit) => exit.targetId),
+        containsAll(<String>['ruins', 'doner', 'college', 'dormitory', 'wb']),
+      );
+      expect(Locations.horse.cols, 16);
+      expect(Locations.horse.rows, 8);
+      expect(Locations.horse.outsideTile, 9);
+      expect(Locations.horse.tileAt(0, 4), 4);
+      expect(Locations.horse.tileAt(5, 0), 4);
+      expect(Locations.horse.tileAt(10, 0), 9);
+      expect(Locations.horse.tileAt(15, 2), 4);
+      expect(Locations.horse.tileAt(15, 5), 4);
+      expect(Locations.horse.tileAt(10, 7), 4);
+      expect(
+        Locations.horse.tiles.expand((row) => row),
+        everyElement(isNot(6)),
+      );
       // Платформа из камня и дерева убрана: площадка Коня теперь земля
       // с цветами, без каменных/деревянных тайлов (10, 11).
       expect(
@@ -211,6 +234,7 @@ void main() {
     test('shop interiors return to the Bridge', () {
       expect(Locations.kopeechka.name, 'Копеечка');
       expect(Locations.cheburechnaya.name, 'Чебуречная');
+      expect(Locations.doner.name, 'Донер (шаурмечная)');
       expect(Locations.kopeechka.exits.single.targetId, 'ruins');
       expect(Locations.cheburechnaya.exits.single.targetId, 'ruins');
     });
@@ -238,7 +262,7 @@ void main() {
       expect(Locations.meadow.tileAt(6, 5), 11);
       expect(
         Locations.meadow.enemies.map((spawn) => spawn.enemyId),
-        containsAll(<String>['shaurmek', 'viktor_korneplod']),
+        contains('viktor_korneplod'),
       );
       expect(Locations.forest.isWalkable(3, 2), isFalse);
       expect(Locations.forest.isWalkable(9, 3), isFalse);

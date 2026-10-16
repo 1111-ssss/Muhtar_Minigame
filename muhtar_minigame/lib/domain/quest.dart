@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 /// Задание. Тип цели определяет, как считается прогресс.
-enum QuestType { kill, collect, location, deliverItem, miniGame }
+enum QuestType { kill, collect, location, deliverItem, purchaseItem, miniGame }
 
 enum QuestState { notStarted, active, completed, claimed }
 
@@ -18,6 +18,7 @@ class Quest {
     this.locationId,
     this.itemId,
     this.acceptanceNpcId,
+    this.acceptancePropId,
     this.xpReward = 15,
     this.artifactCaseReward = 1,
     this.skinRewardId,
@@ -53,6 +54,9 @@ class Quest {
 
   /// Если задан, задание можно взять только через этого NPC.
   final String? acceptanceNpcId;
+
+  /// Если задан, задание можно взять только через этот интерактивный объект.
+  final String? acceptancePropId;
 
   /// Скин, который выдаётся при получении награды за задание.
   final String? skinRewardId;

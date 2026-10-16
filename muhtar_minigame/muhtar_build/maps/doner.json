@@ -1,0 +1,89 @@
+{
+  "format": 1,
+  "id": "doner",
+  "name": "Донер (шаурмечная)",
+  "tiles": [
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1],
+    [1, 0, 0, 2, 2, 2, 2, 2, 0, 0, 0, 1],
+    [4, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  ],
+  "spawn": [8, 4],
+  "enemies": [
+    {
+      "enemyId": "shaurmek",
+      "col": 6,
+      "row": 4
+    }
+  ],
+  "npcs": [
+    {
+      "id": "shaurmek",
+      "name": "Шаурмек 2",
+      "col": 6,
+      "row": 3
+    }
+  ],
+  "additionalNpcs": [],
+  "exits": [
+    {
+      "col": 0,
+      "row": 4,
+      "targetId": "horse",
+      "arrival": [5, 1],
+      "direction": "auto"
+    }
+  ],
+  "props": [
+    {
+      "id": "doner_counter",
+      "kind": "platform",
+      "col": 5,
+      "row": 1,
+      "width": 4,
+      "height": 1,
+      "blocksMovement": false,
+      "variant": 1,
+      "searchable": false
+    },
+    {
+      "id": "doner_grill",
+      "kind": "platform",
+      "col": 2,
+      "row": 2,
+      "width": 2,
+      "height": 1,
+      "blocksMovement": false,
+      "variant": 2,
+      "searchable": false
+    },
+    {
+      "id": "doner_table",
+      "kind": "bench",
+      "col": 6,
+      "row": 5,
+      "width": 2,
+      "height": 1,
+      "blocksMovement": false,
+      "variant": 1,
+      "searchable": false
+    },
+    {
+      "id": "doner_trash",
+      "kind": "trashBin",
+      "col": 10,
+      "row": 2,
+      "width": 1,
+      "height": 1,
+      "blocksMovement": false,
+      "variant": 1,
+      "searchable": true
+    }
+  ],
+  "outsideTile": 5,
+  "outsideGroundRegions": []
+}

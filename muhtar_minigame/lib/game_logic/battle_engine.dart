@@ -402,8 +402,10 @@ class BattleEngine extends ChangeNotifier {
         .toList();
   }
 
-  /// Усиление только на этот раунд, до 6. Улучшатели не усиливают друг друга,
-  /// поэтому порядок установки не создаёт цепочек и не меняет результат.
+  /// Усиление только на этот раунд. Каждая кость улучшения добавляет к целевой
+  /// кости своё текущее выпавшее значение; верхнего ограничения в 6 нет.
+  /// Поэтому несколько улучшателей на одной ячейке складываются: 6 + 2 = 8,
+  /// а 6 + 2 + 3 = 11.
   int effectiveValueAt(int cell) {
     if (!_validCell(cell) || _board[cell] == null) return 0;
     final target = _board[cell]!;
@@ -416,7 +418,7 @@ class BattleEngine extends ChangeNotifier {
         value += die.value;
       }
     }
-    return value.clamp(1, 6).toInt();
+    return value;
   }
 
   /// Уровень кости из инвентаря.
@@ -451,10 +453,9 @@ class BattleEngine extends ChangeNotifier {
         case DiceAbility.warrior:
           attack += value + (artifacts[Artifact.whetstone] ?? 0);
         case DiceAbility.doctor:
-          // Лечение доктора всегда равно уровню этой кости из инвентаря.
-          // Upgrade временно меняет выпавшее значение атакующих/защитных
-          // костей, но не превращает бросок в постоянный уровень.
-          heal += effectiveLevelAt(cell);
+          // Кость улучшения работает с текущим броском любой другой кости,
+          // включая лечение. Постоянный уровень Dice при этом не меняется.
+          heal += value;
         case DiceAbility.guardian:
           shield += value;
         case DiceAbility.ember:

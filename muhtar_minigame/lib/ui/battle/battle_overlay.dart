@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1168,28 +1169,35 @@ class _FighterPanelState extends State<_FighterPanel>
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        'assets/portraits/${fighter.appearance}.png',
-        fit: BoxFit.cover,
-        errorBuilder: (_, error, stack) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.image_outlined,
-                size: 48,
-                color: Color(0xFFABA1B5),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                fighter.name,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Color(0xFFD4C8DD), fontSize: 18),
-              ),
-            ],
-          ),
-        ),
-      ),
+       child: Image.asset(
+         'assets/portraits/${fighter.appearance}.png',
+         fit: BoxFit.cover,
+         errorBuilder: (_, error, stack) => Center(
+           child: fighter.appearance == 'player_kartofla'
+               ? const SizedBox.expand(
+                   child: CustomPaint(painter: _KartoflaPortraitPainter()),
+                 )
+               : Column(
+                   mainAxisSize: MainAxisSize.min,
+                   children: [
+                     const Icon(
+                       Icons.image_outlined,
+                       size: 48,
+                       color: Color(0xFFABA1B5),
+                     ),
+                     const SizedBox(height: 12),
+                     Text(
+                       fighter.name,
+                       textAlign: TextAlign.center,
+                       style: const TextStyle(
+                         color: Color(0xFFD4C8DD),
+                         fontSize: 18,
+                       ),
+                     ),
+                   ],
+                 ),
+         ),
+       ),
     );
     return SizedBox(
       width: widget.width,
@@ -1351,6 +1359,61 @@ class _FighterPanelState extends State<_FighterPanel>
       child: stat,
     );
   }
+}
+
+class _KartoflaPortraitPainter extends CustomPainter {
+  const _KartoflaPortraitPainter();
+
+  @override
+  void paint(ui.Canvas canvas, ui.Size size) {
+    final paint = ui.Paint()..isAntiAlias = true;
+    final center = ui.Offset(size.width / 2, size.height / 2);
+    paint.color = const ui.Color(0xFF3A271F);
+    canvas.drawRect(ui.Offset.zero & size, paint);
+    paint.color = const ui.Color(0xFFC9854F);
+    canvas.drawOval(
+      ui.Rect.fromCenter(
+        center: center,
+        width: size.width * .58,
+        height: size.height * .68,
+      ),
+      paint,
+    );
+    paint.color = const ui.Color(0xFFF0C66D);
+    canvas.drawRect(
+      ui.Rect.fromLTWH(
+        size.width * .19,
+        size.height * .16,
+        size.width * .62,
+        size.height * .09,
+      ),
+      paint,
+    );
+    paint.color = const ui.Color(0xFF4C3024);
+    canvas.drawCircle(
+      ui.Offset(size.width * .39, size.height * .48),
+      size.width * .035,
+      paint,
+    );
+    canvas.drawCircle(
+      ui.Offset(size.width * .61, size.height * .48),
+      size.width * .035,
+      paint,
+    );
+    paint.color = const ui.Color(0xFFFFD891);
+    canvas.drawRect(
+      ui.Rect.fromLTWH(
+        size.width * .32,
+        size.height * .66,
+        size.width * .36,
+        size.height * .055,
+      ),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _KartoflaPortraitPainter oldDelegate) => false;
 }
 
 class _CombatFloat extends StatefulWidget {
