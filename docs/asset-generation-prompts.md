@@ -45,6 +45,10 @@
   тонких линий меньше одного пикселя в целевом размере.
 - **Единый масштаб:** персонаж занимает примерно 70–85% высоты кадра, но не
   касается краёв; тень отделена от силуэта и не запекается в прозрачный фон.
+- **Референсы героя и Софии:** используйте приложенные фотографии только как
+  визуальный референс внешности и костюма. Переводите их в вымышленный игровой
+  образ: не переносите зеркало, телефон, комнату, Telegram-интерфейс, жесты и
+  другие детали исходных фотографий.
 
 ## Форматы и размеры
 
@@ -107,15 +111,20 @@ prompt:
 
 **Промпт:**
 
-> Vertical 512x576 pixel-art RPG portrait of Buberchik, a funny young courier
-> hero with a confident but slightly confused expression, short dark hair,
-> oversized yellow-orange hoodie, small delivery shoulder bag, simple warm skin
-> tone, amber and teal rim light, dark blue-gray urban background with tiny
-> abstract station lights, centered bust, bold readable silhouette, detailed
-> face, hand-crafted 16-bit pixel art, crisp pixel clusters, no text, transparent
-> outer edges around the character
+> Vertical 512x576 pixel-art RPG portrait of Buberchik, a fictionalized game
+> character based on the supplied appearance reference: slim teenage boy with
+> short dark brown hair brushed upward at the front, youthful oval face, dark
+> expressive eyes and a confident but slightly confused expression. He wears an
+> oversized black T-shirt with a subtle gray geometric tech print, black
+> knee-length shorts, black headphones resting around his neck and a small
+> colorful round pendant. Use a simplified muted teal background with abstract
+> shapes, not a bedroom or mirror selfie. Centered bust-to-waist composition,
+> warm skin tone, amber and teal rim light, bold readable silhouette, detailed
+> face, hand-crafted 16-bit pixel art, crisp pixel clusters, no phone, no hand
+> gesture, no text, no logos, transparent outer edges around the character
 
-**Проверка:** лицо и жёлтая толстовка читаются в маленькой рамке; нет телефона,
+**Проверка:** короткие тёмные волосы, чёрная футболка, наушники на шее и
+подростковое лицо должны читаться в маленькой рамке; нет телефона, зеркала,
 оружия или случайного логотипа.
 
 ### `muhtar_minigame/assets/portraits/player_ribka_reward.png`
@@ -160,15 +169,20 @@ prompt:
 
 **Промпт:**
 
-> Vertical 512x576 pixel-art RPG portrait of Sofia, an aloof eccentric teenage
-> girl with a completely white oversized outfit, pale blond hair, square dark
-> glasses, tiny golden accessory, unimpressed expression, surreal fanfic-writer
-> energy, minimal pale background with faint park foliage, white clothing must
-> remain readable against a muted blue-gray background, centered bust, crisp
-> 16-bit pixel art, no text, no watermark
+> Vertical 512x576 pixel-art RPG portrait of Sofia, a fictionalized game
+> character based on the supplied cosplay appearance reference: pale teenage
+> girl with platinum-white asymmetrical hair, long strands sweeping across and
+> hiding one eye, one visible eye with a subtle rose-red iris, calm severe
+> expression, black high-collar cloak or oversized black hoodie with a deep
+> crimson inner hood and shoulder accent. No glasses. Keep the mood mysterious
+> and stylish, not horror. Use a simplified cool blue outdoor background, not a
+> screenshot or real street scene, centered close bust, strong pale-hair
+> silhouette, crisp hand-crafted 16-bit pixel art, no phone, no interface, no
+> text, no watermark
 
-**Проверка:** белый костюм не должен сливаться с фоном; очки и холодное
-выражение лица обязательны.
+**Проверка:** платиновые волосы должны закрывать один глаз, второй глаз с
+розово-красной радужкой должен оставаться видимым; чёрный высокий ворот и
+красная внутренняя деталь обязательны, очков и белой одежды быть не должно.
 
 ### `muhtar_minigame/assets/ribka.png`
 
@@ -354,16 +368,20 @@ prompt:
 **Промпт:**
 
 > Pixel-art character sprite sheet, 4 rows by 4 columns, each cell exactly 64x64,
-> transparent background. Buberchik, a funny young courier hero in a yellow
-> orange hoodie, dark trousers, small delivery shoulder bag, short dark hair.
+> transparent background. Fictionalized Buberchik based on the supplied
+> appearance reference: slim teenage boy, short dark brown hair brushed upward,
+> oversized black T-shirt with a subtle gray geometric print, black knee-length
+> shorts, black headphones around his neck and a tiny round pendant. Keep the
+> silhouette compact and readable at 64x64.
 > Row 1 faces camera, row 2 faces left, row 3 faces right, row 4 faces away.
 > Frames are idle, left foot forward, idle, right foot forward. Full body in
-> every cell, feet aligned to the same baseline, compact readable silhouette,
-> warm amber and teal accents, hand-crafted 16-bit pixel art, no shadows outside
-> the feet, no text, no border, no watermark.
+> every cell, feet aligned to the same baseline, preserve the black outfit and
+> upward-swept hair in all directions, hand-crafted 16-bit pixel art, no phone,
+> no mirror, no shadows outside the feet, no text, no border, no watermark.
 
 **Проверка:** все 16 кадров находятся в сетке, персонаж не прыгает по высоте,
-сумка остаётся на одном плече.
+чёрная футболка, шорты и наушники остаются узнаваемыми; жёлтой толстовки и
+сумки в этом варианте нет.
 
 ### `muhtar_minigame/assets/sprites/characters/player_ribka_reward.png`
 
@@ -403,10 +421,16 @@ prompt:
 **Промпт:**
 
 > Pixel-art 4x4 character sprite sheet, each cell 64x64, transparent background.
-> Sofia, an aloof eccentric girl in a bright white oversized outfit, pale blond
-> hair and square dark glasses. Four directions, four subtle walking frames,
-> strong dark outline so the white clothes remain visible, 16-bit pixel art,
-> consistent feet baseline, no text, no logo.
+> Sofia based on the supplied cosplay appearance reference: pale girl with
+> platinum-white asymmetrical hair sweeping over and hiding one eye, one visible
+> rose-red eye, black high-collar cloak or oversized black hoodie with a deep
+> crimson inner hood and shoulder accent. No glasses, no white outfit. Four
+> directions, four subtle walking frames, hair strand and cloak move only by one
+> or two pixels, strong dark outline, 16-bit pixel art, consistent feet baseline,
+> no phone, no interface, no text, no logo.
+
+**Проверка:** силуэт должен читаться как белые волосы + чёрный плащ с красной
+деталью; закрытый волосами глаз не должен внезапно появляться в боковых кадрах.
 
 ### `muhtar_minigame/assets/sprites/characters/ribka.png`
 
