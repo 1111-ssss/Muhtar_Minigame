@@ -5,6 +5,10 @@
 **/build/
 **/coverage/
 
+# The MuhtarBuild editor is source code, not generated Flutter output.
+!muhtar_minigame/lib/build/
+!muhtar_minigame/lib/build/**
+
 # Local runtime data
 muhtar_minigame/save/
 muhtar_minigame/muhtar_build/backups/
