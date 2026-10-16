@@ -23,6 +23,13 @@ class IsometricMap extends Component {
   static const double tileWidth = 80;
   static const double tileHeight = 40;
 
+  /// Тайлы одинакового визуального стиля переиспользуются между картами.
+  /// Раньше новый tile sheet создавался при каждом переходе, поэтому первый
+  /// переход после запуска одновременно запускал растеризацию и отрисовку
+  /// новой карты.
+  static final Map<String, Image> _tileImageCache = {};
+  static final Map<String, Future<Image>> _tileImageLoads = {};
+
   /// Проецирует точку локального квадратного тайла в его изометрический
   /// ромб. `u` идёт вдоль `(col + 1, row)`, `v` — вдоль `(col, row + 1)`.
   static Offset projectTilePoint(double u, double v, {double tileOffsetX = 0}) {
@@ -44,27 +51,64 @@ class IsometricMap extends Component {
 
   @override
   Future<void> onLoad() async {
-    _tileImage = await _generateTileSheet();
+    _tileImage = await _tileImageForStyle(_tileStyleKey(location));
+  }
+
+  /// Прогревает tile sheet до появления игрового экрана. Это переносит
+  /// дорогой первый [Picture.toImage] на splash, а не на первый телепорт.
+  static Future<void> precache(LocationDef location) async {
+    await _tileImageForStyle(_tileStyleKey(location));
+  }
+
+  static String _tileStyleKey(LocationDef location) {
+    if (location.id == 'kopeechka' || location.id == 'cheburechnaya') {
+      return 'shop';
+    }
+    return switch (location.id) {
+      'meadow' => 'meadow',
+      'ruins' => 'ruins',
+      _ => 'grass',
+    };
+  }
+
+  static Future<Image> _tileImageForStyle(String style) async {
+    final cached = _tileImageCache[style];
+    if (cached != null) return cached;
+
+    final pending = _tileImageLoads[style];
+    if (pending != null) return pending;
+
+    final load = _generateTileSheet(style);
+    _tileImageLoads[style] = load;
+    try {
+      final image = await load;
+      _tileImageCache[style] = image;
+      return image;
+    } finally {
+      if (identical(_tileImageLoads[style], load)) {
+        _tileImageLoads.remove(style);
+      }
+    }
   }
 
   /// Генерирует горизонтальную полоску из ромбовидных тайлов. Тайл 5 —
   /// прозрачная пустота, 6 — вода, 7 — серый приподнятый край моста,
   /// 9 — плоская земля берегов, 13 — травяная площадка.
-  Future<Image> _generateTileSheet() async {
+  static Future<Image> _generateTileSheet(String style) async {
     final pictureRecorder = PictureRecorder();
     final canvas = Canvas(pictureRecorder);
     const w = tileWidth;
     const h = tileHeight;
     final colors = [
-      location.id == 'kopeechka' || location.id == 'cheburechnaya'
+      style == 'shop'
           ? const Color(0xFF767C82)
-          : switch (location.id) {
+          : switch (style) {
               'meadow' => const Color(0xFF9A8062),
               'ruins' => const Color(0xFF807E78),
               _ => const Color(0xFF4C9A4C),
             }, // 0 пол/трава
       const Color(0xFF6B5A4A), // 1 стена
-      location.id == 'kopeechka' || location.id == 'cheburechnaya'
+      style == 'shop'
           ? const Color(0xFF8B9094)
           : const Color(0xFFC8A872), // 2 дорога / серый пол магазина
       const Color(0xFF2E7D32), // 3 лесная кромка

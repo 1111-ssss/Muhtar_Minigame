@@ -392,10 +392,15 @@ class MuhtarGame extends FlameGame
       // сразу, иначе закрытие приложения во время перехода откатит задание.
       // Выполненные задания не забираются автоматически: награду должен
       // подтвердить игрок в журнале заданий.
-      await saveProgress();
+      // Даём Flutter сначала показать fade-out. Иначе синхронный jsonEncode
+      // внутри save() может задержать первый кадр перехода.
+      await Future<void>.delayed(Duration.zero);
       // Полный fade-out должен закончиться до того, как содержимое мира будет
       // заменено, иначе на один кадр видны старые сущности.
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await Future.wait<void>([
+        saveProgress(),
+        Future<void>.delayed(const Duration(milliseconds: 500)),
+      ]);
       final sourceId = gameState.currentLocationId;
       gameState.currentLocationId = exit.targetId;
       await world_.loadLocation(
