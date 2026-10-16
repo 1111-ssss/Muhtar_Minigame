@@ -808,7 +808,11 @@ class GameState extends ChangeNotifier {
       ..addAll(
         (json['purchasedShopItems'] as List?)?.whereType<String>() ?? const [],
       );
-    _currentLocationId = json['currentLocationId'] as String? ?? 'meadow';
+    final savedLocationId = json['currentLocationId'] as String?;
+    _currentLocationId =
+        savedLocationId != null && Locations.byId(savedLocationId) != null
+        ? savedLocationId
+        : 'meadow';
 
     _ownedSkinIds
       ..clear()
