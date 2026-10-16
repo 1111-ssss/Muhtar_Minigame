@@ -217,7 +217,7 @@ class _VideoSequenceOverlayState extends State<VideoSequenceOverlay> {
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
-                      'РАЗДЕВАЛКА ОЗОНА · КАРТОФЛЯ',
+                      'РАЗДЕВАЛКА ВБ · КАРТОФЛЯ',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,

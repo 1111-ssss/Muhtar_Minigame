@@ -14,9 +14,14 @@ import '../../domain/locations.dart';
 /// компонент отвечает только за согласованное преобразование сетки в мир и
 /// обратно. Поэтому A* и коллизии не зависят от угла обзора камеры.
 class IsometricMap extends Component {
-  IsometricMap(this.location) : super(priority: 0);
+  IsometricMap(this.location, {this.propFilter}) : super(priority: 0);
 
   final LocationDef location;
+
+  /// Динамический фильтр декоративных объектов. Он вызывается во время
+  /// отрисовки, поэтому карта сразу отражает изменения GameState без
+  /// пересоздания Flame-компонента.
+  final bool Function(LocationProp prop)? propFilter;
 
   /// Полный размер ромба. Умеренная высота оставляет карту читаемой и не
   /// превращает её в «алмаз» с углом 45°.
@@ -372,16 +377,12 @@ class IsometricMap extends Component {
           tileWidth,
           tileHeight,
         );
-        canvas.drawImageRect(
-          _tileImage,
-          src,
-          dst,
-          _tilePaint,
-        );
+        canvas.drawImageRect(_tileImage, src, dst, _tilePaint);
       }
     }
 
     for (final prop in _sortedProps) {
+      if (propFilter != null && !propFilter!(prop)) continue;
       _renderProp(canvas, prop);
     }
 
@@ -432,12 +433,7 @@ class IsometricMap extends Component {
           tileWidth,
           tileHeight,
         );
-        canvas.drawImageRect(
-          _tileImage,
-          src,
-          dst,
-          _tilePaint,
-        );
+        canvas.drawImageRect(_tileImage, src, dst, _tilePaint);
       }
     }
   }
@@ -481,6 +477,11 @@ class IsometricMap extends Component {
     canvas.save();
     if (prop.specialItemId == 'potato') {
       _renderPotatoProp(canvas, position, paint);
+      canvas.restore();
+      return;
+    }
+    if (prop.id == 'wb_fitting_room') {
+      _renderFittingRoom(canvas, prop);
       canvas.restore();
       return;
     }
@@ -657,10 +658,7 @@ class IsometricMap extends Component {
       Rect.fromLTWH(position.x - 7, position.y - 12, 4, 3),
       paint,
     );
-    canvas.drawRect(
-      Rect.fromLTWH(position.x + 5, position.y - 4, 3, 3),
-      paint,
-    );
+    canvas.drawRect(Rect.fromLTWH(position.x + 5, position.y - 4, 3, 3), paint);
     paint.color = const Color(0xFF5D3D2A);
     canvas.drawRect(
       Rect.fromLTWH(position.x - 3, position.y - 16, 3, 3),
@@ -970,6 +968,96 @@ class IsometricMap extends Component {
       color: light,
       edgeColor: dark,
       thickness: 4,
+    );
+  }
+
+  void _renderFittingRoom(Canvas canvas, LocationProp prop) {
+    // The fitting room is a prop rather than a person: a small booth with a
+    // raised floor, two posts, and a curtain. Keeping it in the map layer
+    // makes the interaction visible without adding an NPC spawn.
+    for (var col = prop.col; col < prop.col + prop.width; col++) {
+      _drawPrismTile(
+        canvas,
+        baseCenter: tileToWorld(col, prop.row),
+        topColor: const Color(0xFFB9A5C8),
+        side: const Color(0xFF685A78),
+        end: const Color(0xFF89779B),
+        lift: -7,
+      );
+    }
+
+    final leftPost = _propPoint(prop, .18, 0, lift: -12);
+    final rightPost = _propPoint(
+      prop,
+      prop.width.toDouble() - .18,
+      0,
+      lift: -12,
+    );
+    final leftTop = leftPost.translate(0, -48);
+    final rightTop = rightPost.translate(0, -48);
+    final wall = Path()
+      ..moveTo(leftPost.dx, leftPost.dy)
+      ..lineTo(rightPost.dx, rightPost.dy)
+      ..lineTo(rightTop.dx, rightTop.dy)
+      ..lineTo(leftTop.dx, leftTop.dy)
+      ..close();
+    canvas.drawPath(
+      wall,
+      Paint()
+        ..color = const Color(0xFF7B4E8E)
+        ..isAntiAlias = false,
+    );
+    canvas.drawLine(
+      leftTop,
+      rightTop,
+      Paint()
+        ..color = const Color(0xFFE0B7EA)
+        ..strokeWidth = 4
+        ..isAntiAlias = false,
+    );
+    canvas.drawLine(
+      leftTop,
+      leftPost,
+      Paint()
+        ..color = const Color(0xFF3D294A)
+        ..strokeWidth = 5
+        ..isAntiAlias = false,
+    );
+    canvas.drawLine(
+      rightTop,
+      rightPost,
+      Paint()
+        ..color = const Color(0xFF3D294A)
+        ..strokeWidth = 5
+        ..isAntiAlias = false,
+    );
+
+    final curtainLeft = _propPoint(prop, .74, 0, lift: -12);
+    final curtainRight = _propPoint(
+      prop,
+      prop.width.toDouble() - .74,
+      0,
+      lift: -12,
+    );
+    final curtain = Path()
+      ..moveTo(curtainLeft.dx, curtainLeft.dy)
+      ..lineTo(curtainRight.dx, curtainRight.dy)
+      ..lineTo(curtainRight.dx, curtainRight.dy - 40)
+      ..lineTo(curtainLeft.dx, curtainLeft.dy - 40)
+      ..close();
+    canvas.drawPath(
+      curtain,
+      Paint()
+        ..color = const Color(0xFFD68BCB)
+        ..isAntiAlias = false,
+    );
+    canvas.drawLine(
+      curtainLeft.translate(0, -40),
+      curtainRight.translate(0, -40),
+      Paint()
+        ..color = const Color(0xFFFFD7F4)
+        ..strokeWidth = 3
+        ..isAntiAlias = false,
     );
   }
 

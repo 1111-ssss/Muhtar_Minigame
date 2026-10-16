@@ -76,6 +76,7 @@ class BuildMapDocument {
               variant: prop.variant,
               searchable: prop.searchable,
               specialItemId: prop.specialItemId,
+              interactionId: prop.interactionId,
             ),
           )
           .toList(),
@@ -317,6 +318,7 @@ class BuildMapDocument {
             variant: prop.variant,
             searchable: prop.searchable,
             specialItemId: prop.specialItemId,
+            interactionId: prop.interactionId,
           ),
         )
         .toList(growable: false),
@@ -459,6 +461,7 @@ class BuildProp {
     required this.variant,
     required this.searchable,
     required this.specialItemId,
+    required this.interactionId,
   });
 
   factory BuildProp.fromJson(Object? value) {
@@ -476,6 +479,7 @@ class BuildProp {
       variant: (json['variant'] as num?)?.toInt() ?? 0,
       searchable: json['searchable'] as bool? ?? false,
       specialItemId: json['specialItemId'] as String?,
+      interactionId: json['interactionId'] as String?,
     );
   }
 
@@ -489,6 +493,7 @@ class BuildProp {
   int variant;
   bool searchable;
   String? specialItemId;
+  String? interactionId;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -501,6 +506,7 @@ class BuildProp {
     'variant': variant,
     'searchable': searchable,
     if (specialItemId != null) 'specialItemId': specialItemId,
+    if (interactionId != null) 'interactionId': interactionId,
   };
 }
 

@@ -1660,6 +1660,7 @@ class _EntityDialogState extends State<_EntityDialog> {
     _field('height', _initial['height'] ?? 1);
     _field('variant', _initial['variant'] ?? 0);
     _field('specialItemId', _initial['specialItemId']);
+    _field('interactionId', _initial['interactionId']);
     final arrival = _initial['arrival'] as List?;
     _field('arrivalCol', arrival?.firstOrNull);
     _field(
@@ -1743,6 +1744,9 @@ class _EntityDialogState extends State<_EntityDialog> {
         'specialItemId': text('specialItemId').isEmpty
             ? null
             : text('specialItemId'),
+        'interactionId': text('interactionId').isEmpty
+            ? null
+            : text('interactionId'),
       });
     } else if (_exit) {
       final ac = int.tryParse(text('arrivalCol'));
@@ -1865,6 +1869,12 @@ class _EntityDialogState extends State<_EntityDialog> {
                 _text(
                   'specialItemId',
                   'ID особого предмета (необязательно)',
+                  optional: true,
+                ),
+                _text(
+                  'interactionId',
+                  'ID действия (необязательно)',
+                  hint: 'Например, q_kartofla_videos',
                   optional: true,
                 ),
               ] else if (_exit) ...[

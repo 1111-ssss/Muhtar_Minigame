@@ -132,6 +132,17 @@ class GameState extends ChangeNotifier {
 
   SearchResult? searchResult(String propId) => _searchResults[propId];
 
+  /// Возвращает, должен ли проп оставаться видимым и доступным для поиска.
+  ///
+  /// Обычные поисковые объекты можно исследовать снова по старому правилу
+  /// игры. Объект с [LocationProp.specialItemId] — одноразовый: успешный
+  /// поиск фиксируется в [searchResult] и скрывает его навсегда, независимо от
+  /// того, находится предмет ещё в инвентаре или уже был передан по квесту.
+  bool isPropVisible(LocationProp prop) {
+    if (prop.specialItemId == null) return true;
+    return _searchResults[prop.id]?.completed != true;
+  }
+
   /// Цена следующего места в хотбаре.
   int get diceUpgradeCost => 35 + (dicePerTurn - 1) * 25;
   int get rerollUpgradeCost => 25 + (rerollsPerRound - 1) * 20;
@@ -328,7 +339,8 @@ class GameState extends ChangeNotifier {
     }
     final requiredEnemy = item.requiredEnemyId;
     final requiredLocation = item.requiredLocationId;
-    if (requiredEnemy != null && requiredLocation != null &&
+    if (requiredEnemy != null &&
+        requiredLocation != null &&
         !hasDefeatedEnemyAt(requiredLocation, requiredEnemy)) {
       return false;
     }
@@ -532,15 +544,17 @@ class GameState extends ChangeNotifier {
 
   QuestProgress? quest(String id) => _quests[id];
 
-  bool canActivateQuest(String id, {String? npcId}) {
+  bool canActivateQuest(String id, {String? npcId, String? propId}) {
     final q = _quests[id];
     if (q == null || q.state != QuestState.notStarted) return false;
     final acceptanceNpcId = q.quest.acceptanceNpcId;
-    return acceptanceNpcId == null || acceptanceNpcId == npcId;
+    final acceptancePropId = q.quest.acceptancePropId;
+    return (acceptanceNpcId == null || acceptanceNpcId == npcId) &&
+        (acceptancePropId == null || acceptancePropId == propId);
   }
 
-  bool activateQuest(String id, {String? npcId}) {
-    if (!canActivateQuest(id, npcId: npcId)) return false;
+  bool activateQuest(String id, {String? npcId, String? propId}) {
+    if (!canActivateQuest(id, npcId: npcId, propId: propId)) return false;
     final q = _quests[id]!;
     q.state = QuestState.active;
     notifyListeners();
@@ -798,9 +812,8 @@ class GameState extends ChangeNotifier {
       }
     }
     final shawarmaOutcome = json['shawarmaOutcome']?.toString();
-    _shawarmaOutcome = const {'eaten', 'forIlya', 'delivered'}.contains(
-      shawarmaOutcome,
-    )
+    _shawarmaOutcome =
+        const {'eaten', 'forIlya', 'delivered'}.contains(shawarmaOutcome)
         ? shawarmaOutcome
         : null;
     _purchasedShopItems
@@ -808,7 +821,11 @@ class GameState extends ChangeNotifier {
       ..addAll(
         (json['purchasedShopItems'] as List?)?.whereType<String>() ?? const [],
       );
-    _currentLocationId = json['currentLocationId'] as String? ?? 'meadow';
+    final savedLocationId = json['currentLocationId'] as String?;
+    _currentLocationId =
+        savedLocationId != null && Locations.byId(savedLocationId) != null
+        ? savedLocationId
+        : 'meadow';
 
     _ownedSkinIds
       ..clear()
@@ -864,8 +881,7 @@ class GameState extends ChangeNotifier {
     _defeatedEnemyAccess
       ..clear()
       ..addAll(
-        (json['defeatedEnemyAccess'] as List?)?.whereType<String>() ??
-            const [],
+        (json['defeatedEnemyAccess'] as List?)?.whereType<String>() ?? const [],
       );
     final respawns = json['enemyRespawns'] as Map?;
     if (respawns != null) {

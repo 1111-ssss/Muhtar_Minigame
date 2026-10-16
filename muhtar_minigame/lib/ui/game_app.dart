@@ -109,10 +109,7 @@ class _GameAppState extends State<GameApp> with WidgetsBindingObserver {
         .map((exit) => Locations.byId(exit.targetId))
         .whereType<LocationDef>()
         .firstOrNull;
-    final locations = [
-      current,
-      if (firstDestination != null) firstDestination,
-    ];
+    final locations = [current, ?firstDestination];
     await Future.wait(locations.map(IsometricMap.precache));
   }
 

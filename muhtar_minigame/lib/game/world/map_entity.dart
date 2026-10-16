@@ -176,8 +176,8 @@ abstract class MapEntity extends PositionComponent {
           paint,
           bodyColor: const Color(0xFF343A52),
           accentColor: const Color(0xFF78F3D0),
-           skinTone: const Color(0xFFE8B89A),
-         );
+          skinTone: const Color(0xFFE8B89A),
+        );
       case 'kartofla':
         _renderKartofla(canvas, paint);
       default:
@@ -208,13 +208,6 @@ abstract class MapEntity extends PositionComponent {
           paint,
           bodyColor: const Color(0xFF2D7D9A),
           accentColor: const Color(0xFF7DE0F2),
-        );
-      case 'ozon_locker':
-        _renderHumanoid(
-          canvas,
-          paint,
-          bodyColor: const Color(0xFF147A8A),
-          accentColor: const Color(0xFF62E6E8),
         );
       default:
         _renderHumanoid(canvas, paint, hood: true);

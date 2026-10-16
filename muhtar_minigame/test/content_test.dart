@@ -51,10 +51,14 @@ void main() {
       Locations.meadow.enemies.map((spawn) => spawn.enemyId),
       contains('viktor_korneplod'),
     );
-    expect(Locations.meadow.enemies.map((spawn) => spawn.enemyId),
-        isNot(contains('shaurmek')));
-    expect(Locations.doner.enemies.map((spawn) => spawn.enemyId),
-        contains('shaurmek'));
+    expect(
+      Locations.meadow.enemies.map((spawn) => spawn.enemyId),
+      isNot(contains('shaurmek')),
+    );
+    expect(
+      Locations.doner.enemies.map((spawn) => spawn.enemyId),
+      contains('shaurmek'),
+    );
   });
 
   test('новые враги получают отдельные виды сущностей карты', () {
@@ -128,7 +132,7 @@ void main() {
     expect(GameContent.dialogueForNpc('buber'), isNotNull);
   });
 
-  test('Донер, Илья, ПВЗ и Озон соединены с новым контентом', () {
+  test('Донер, Илья, ПВЗ и раздевалка ВБ соединены с новым контентом', () {
     expect(
       Locations.doner.enemies.map((spawn) => spawn.enemyId),
       contains('shaurmek'),
@@ -155,7 +159,13 @@ void main() {
     );
     expect(Locations.college.npcs.single.id, 'ilya');
     expect(Locations.wb.npcs.single.id, 'wb_employee');
-    expect(Locations.ozon.npcs.single.id, 'ozon_locker');
+    final fittingRoom = Locations.wb.props.singleWhere(
+      (prop) => prop.id == 'wb_fitting_room',
+    );
+    expect(fittingRoom.interactionId, 'q_kartofla_videos');
+    expect(fittingRoom.kind, LocationPropKind.platform);
+    expect(Locations.builtIn, hasLength(10));
+    expect(Locations.horse.exits, hasLength(5));
     expect(
       Locations.ruins.props.any(
         (prop) => prop.id == 'bridge_potato' && prop.specialItemId == 'potato',
@@ -177,6 +187,12 @@ void main() {
         'q_kartofla_videos',
       ]),
     );
+    final videoQuest = GameContent.quests.firstWhere(
+      (quest) => quest.id == 'q_kartofla_videos',
+    );
+    expect(videoQuest.acceptanceNpcId, isNull);
+    expect(videoQuest.acceptancePropId, 'wb_fitting_room');
+    expect(GameContent.dialogueForNpc('wb_fitting_room'), isNull);
   });
 
   test(

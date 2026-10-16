@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muhtar_minigame/domain/locations.dart';
+import 'package:muhtar_minigame/domain/quest.dart';
 import 'package:muhtar_minigame/game/muhtar_game.dart';
 import 'package:muhtar_minigame/game/world/enemy_entity.dart';
 import 'package:muhtar_minigame/game_logic/audio_service.dart';
@@ -20,6 +21,7 @@ void main() {
       MuhtarGame.overlayBattleConfirm,
       MuhtarGame.overlayPreBattle,
       MuhtarGame.overlaySearch,
+      MuhtarGame.overlayVideoSequence,
       MuhtarGame.overlayDialog,
       'notifications',
       MuhtarGame.overlayLocationTransition,
@@ -131,5 +133,38 @@ void main() {
 
     await tester.tap(find.text('Закрыть'));
     expect(loaded.itemCount('sync_async'), itemCountBefore);
+  });
+
+  testWidgets('картошка в поиске имеет собственное представление', (
+    tester,
+  ) async {
+    final prop = Locations.ruins.props.singleWhere(
+      (candidate) => candidate.specialItemId == 'potato',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SearchOverlay(game: gameState, prop: prop, onClose: () {}),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.bySemanticsLabel('Осмотреть картошку'), findsOneWidget);
+    expect(find.bySemanticsLabel('Осмотреть куст'), findsNothing);
+  });
+
+  test('интерактивная раздевалка ВБ принимает и продолжает квест', () {
+    final prop = Locations.wb.props.singleWhere(
+      (candidate) => candidate.id == 'wb_fitting_room',
+    );
+
+    game.world_.onPropInteract!(prop);
+    expect(gameState.quest('q_kartofla_videos')!.state, QuestState.active);
+    expect(game.overlays.isActive(MuhtarGame.overlayVideoSequence), isTrue);
+
+    game.closeVideoSequence();
+    game.world_.onPropInteract!(prop);
+    expect(gameState.quest('q_kartofla_videos')!.state, QuestState.active);
+    expect(game.overlays.isActive(MuhtarGame.overlayVideoSequence), isTrue);
   });
 }

@@ -1274,7 +1274,7 @@
           9,
           9,
           9,
-          4,
+          9,
           9,
           9,
           9,
@@ -1465,16 +1465,6 @@
             2
           ],
           "direction": "down"
-        },
-        {
-          "col": 10,
-          "row": 0,
-          "targetId": "ozon",
-          "arrival": [
-            1,
-            3
-          ],
-          "direction": "up"
         }
       ],
       "props": [

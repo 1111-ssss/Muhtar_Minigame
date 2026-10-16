@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../../domain/location.dart';
 import '../../game_logic/game_state.dart';
 
-/// Самостоятельный экран поиска куста или мусорного ведра.
+/// Самостоятельный экран поиска объекта с карты.
 ///
 /// [game] — это [GameState], а не [MuhtarGame]: экран не знает о маршрутизации
 /// игры и подключается к ней одним внешним колбэком. Именованный [state] оставлен
@@ -62,7 +62,9 @@ class _SearchOverlayState extends State<SearchOverlay>
     super.initState();
     _result = _state.searchResult(widget.prop.id);
     _wasCompletedOnOpen =
-        widget.prop.kind == LocationPropKind.bush && _result?.completed == true;
+        _result?.completed == true &&
+        (widget.prop.kind == LocationPropKind.bush ||
+            widget.prop.specialItemId != null);
     _shakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 360),
@@ -177,6 +179,7 @@ class _SearchOverlayState extends State<SearchOverlay>
                             shakeOffset: _shakeOffset,
                             shakeAngle: _shakeAngle,
                             colors: colors,
+                            specialItemId: widget.prop.specialItemId,
                             onTap: _search,
                           ),
                           const SizedBox(height: 16),
@@ -458,6 +461,7 @@ class _IllustrationButton extends StatelessWidget {
     required this.shakeOffset,
     required this.shakeAngle,
     required this.colors,
+    required this.specialItemId,
     required this.onTap,
   });
 
@@ -468,6 +472,7 @@ class _IllustrationButton extends StatelessWidget {
   final Offset shakeOffset;
   final double shakeAngle;
   final _SearchPalette colors;
+  final String? specialItemId;
   final VoidCallback onTap;
 
   @override
@@ -500,6 +505,7 @@ class _IllustrationButton extends StatelessWidget {
                     painter: _SearchPropPainter(
                       kind: prop.kind,
                       variant: prop.variant,
+                      specialItemId: specialItemId,
                       colors: colors,
                       pulse: shakeController.value,
                       reveal: reveal,
@@ -643,6 +649,7 @@ class _SearchPropPainter extends CustomPainter {
   const _SearchPropPainter({
     required this.kind,
     required this.variant,
+    required this.specialItemId,
     required this.colors,
     required this.pulse,
     required this.reveal,
@@ -650,6 +657,7 @@ class _SearchPropPainter extends CustomPainter {
 
   final LocationPropKind kind;
   final int variant;
+  final String? specialItemId;
   final _SearchPalette colors;
   final double pulse;
   final double reveal;
@@ -671,7 +679,9 @@ class _SearchPropPainter extends CustomPainter {
       paint,
     );
 
-    if (kind == LocationPropKind.trashBin) {
+    if (specialItemId == 'potato') {
+      _drawPotato(canvas, center, paint);
+    } else if (kind == LocationPropKind.trashBin) {
       _drawTrashBin(canvas, center, paint);
     } else {
       _drawBush(canvas, center, paint);
@@ -772,6 +782,59 @@ class _SearchPropPainter extends CustomPainter {
     );
   }
 
+  void _drawPotato(Canvas canvas, Offset center, Paint paint) {
+    // Картошка — отдельная находка, а не ещё один куст: крупный силуэт и
+    // тёплая палитра должны читаться даже до анимации раскрытия награды.
+    paint.color = const Color(0xFF3B241B);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(center.dx + 3, center.dy + 50),
+        width: 146,
+        height: 25,
+      ),
+      paint,
+    );
+    paint.color = const Color(0xFF9B5D32);
+    final potato = Path()
+      ..moveTo(center.dx - 58, center.dy + 16)
+      ..cubicTo(
+        center.dx - 66,
+        center.dy - 24,
+        center.dx - 32,
+        center.dy - 58,
+        center.dx + 4,
+        center.dy - 48,
+      )
+      ..cubicTo(
+        center.dx + 43,
+        center.dy - 60,
+        center.dx + 67,
+        center.dy - 23,
+        center.dx + 56,
+        center.dy + 17,
+      )
+      ..cubicTo(
+        center.dx + 41,
+        center.dy + 42,
+        center.dx - 35,
+        center.dy + 45,
+        center.dx - 58,
+        center.dy + 16,
+      )
+      ..close();
+    canvas.drawPath(potato, paint);
+    paint.color = const Color(0xFFD18A4D);
+    canvas.drawRect(
+      Rect.fromLTWH(center.dx - 31, center.dy - 22, 13, 7),
+      paint,
+    );
+    canvas.drawRect(Rect.fromLTWH(center.dx + 17, center.dy - 5, 10, 6), paint);
+    canvas.drawRect(Rect.fromLTWH(center.dx - 2, center.dy + 17, 9, 6), paint);
+    paint.color = const Color(0xFF5D3624);
+    canvas.drawRect(Rect.fromLTWH(center.dx - 8, center.dy - 36, 8, 7), paint);
+    canvas.drawRect(Rect.fromLTWH(center.dx + 31, center.dy + 11, 7, 6), paint);
+  }
+
   void _drawSparkles(Canvas canvas, Offset center, Paint paint) {
     paint.color = const Color(0xFFFFD27D).withValues(alpha: reveal);
     for (var i = 0; i < 7; i++) {
@@ -788,6 +851,7 @@ class _SearchPropPainter extends CustomPainter {
   bool shouldRepaint(covariant _SearchPropPainter oldDelegate) =>
       oldDelegate.kind != kind ||
       oldDelegate.variant != variant ||
+      oldDelegate.specialItemId != specialItemId ||
       oldDelegate.pulse != pulse ||
       oldDelegate.reveal != reveal;
 }
