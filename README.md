@@ -7,7 +7,20 @@ MuhtarBuild — редактор карт и PNG-портретов персон
 
 - Flutter **3.47.7** с поддержкой Linux desktop (версия закреплена в
   `muhtar_minigame/.flutter-version`);
-- Linux-пакеты Flutter desktop или Docker.
+- Linux-пакеты Flutter desktop, `libmpv-dev`, `libepoxy-dev` или Docker.
+
+Для Fedora установите системные зависимости до первого `flutter run`:
+
+```bash
+sudo dnf install clang cmake ninja-build pkgconf-pkg-config gtk3-devel \
+  mpv-devel libepoxy-devel alsa-lib-devel pulseaudio-libs-devel
+pkg-config --modversion mpv
+```
+
+Для Debian/Ubuntu используются эквивалентные пакеты `libmpv-dev` и
+`libepoxy-dev`; полный список уже есть в `Dockerfile`. Ошибка
+`PkgConfig::mpv ... target was not found` означает, что `mpv.pc` не найден в
+системном `pkg-config` path.
 
 ## Установка и запуск
 
@@ -54,16 +67,17 @@ make build
   реплику.
 - На ВБ сотрудник ПВЗ выдаёт поиск картошки на Мосту и отдельную ответную
   реплику после доставки.
-- На Озоне NPC «Раздевалка» запускает три локальных ролика подряд. Кнопки
+- На ВБ интерактивный проп запускает три локальных ролика подряд. Кнопки
   пропуска нет, а закрытие сбрасывает последовательность. После финального
   ролика сразу открывается скин «Картофля».
 
-Перед запуском сюжетной сцены Озона положите файлы из пользовательской папки в
+Перед запуском сюжетной сцены раздевалки положите файлы из пользовательской папки в
 `muhtar_minigame/assets/video/` с именами, перечисленными в
 [`assets/video/README.md`](muhtar_minigame/assets/video/README.md). Видеоплеер
-использует Flutter asset keys, а не абсолютные пути. `video_player` поддерживает
-Android/iOS/macOS/web; на Linux/Windows без отдельного backend игра оставляет
-остальные сценарии доступными и показывает сообщение об отсутствии плеера.
+использует Flutter asset keys с URI `asset:///assets/video/...`, а не абсолютные
+пути. Для воспроизведения подключены `media_kit`, `media_kit_video` и
+`media_kit_libs_video`, включая Linux/Windows; при отсутствии MP4 игра
+показывает graceful error и оставляет остальные сценарии доступными.
 
 ## Docker
 
