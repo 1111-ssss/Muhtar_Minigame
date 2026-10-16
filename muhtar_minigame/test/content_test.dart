@@ -27,7 +27,7 @@ void main() {
     final bridge = dialogue.nodeById('bridge')!;
     expect(briefing.text, contains('Шаурмек'));
     expect(briefing.text, contains('Виктор Корнеплод'));
-    expect(bridge.text, contains('Копеечку'));
+    expect(bridge.text, contains('Донер'));
     expect(bridge.text, contains('Мост'));
     expect(
       GameContent.enemyById('shaurmek')!.attackPhrases,
@@ -43,14 +43,18 @@ void main() {
     expect(GameContent.playerAttackPhrases, contains('Мы блогеры'));
   });
 
-  test('новые враги имеют архетипы и спавны на Вокзале', () {
+  test('новые враги имеют архетипы, а Шаурмек переехал в Донер', () {
     expect(GameContent.enemyById('gopnik')?.name, 'Гопник');
     expect(GameContent.enemyById('shaurmek')?.name, 'Шаурмек');
     expect(GameContent.enemyById('viktor_korneplod')?.name, 'Виктор Корнеплод');
     expect(
       Locations.meadow.enemies.map((spawn) => spawn.enemyId),
-      containsAll(<String>['shaurmek', 'viktor_korneplod']),
+      contains('viktor_korneplod'),
     );
+    expect(Locations.meadow.enemies.map((spawn) => spawn.enemyId),
+        isNot(contains('shaurmek')));
+    expect(Locations.doner.enemies.map((spawn) => spawn.enemyId),
+        contains('shaurmek'));
   });
 
   test('новые враги получают отдельные виды сущностей карты', () {
@@ -122,6 +126,42 @@ void main() {
     expect(GameContent.dialogueForNpc('ribka'), isNotNull);
     expect(GameContent.dialogueForNpc('sofia'), isNotNull);
     expect(GameContent.dialogueForNpc('buber'), isNotNull);
+  });
+
+  test('Донер, Илья, ПВЗ и Озон соединены с новым контентом', () {
+    expect(
+      Locations.doner.enemies.map((spawn) => spawn.enemyId),
+      contains('shaurmek'),
+    );
+    expect(Locations.doner.npcs.single.id, 'shaurmek');
+    expect(
+      Locations.doner.props.map((prop) => prop.id),
+      containsAll(<String>['doner_counter', 'doner_grill', 'doner_table']),
+    );
+    expect(Locations.college.npcs.single.id, 'ilya');
+    expect(Locations.wb.npcs.single.id, 'wb_employee');
+    expect(Locations.ozon.npcs.single.id, 'ozon_locker');
+    expect(
+      Locations.ruins.props.any(
+        (prop) => prop.id == 'bridge_potato' && prop.specialItemId == 'potato',
+      ),
+      isTrue,
+    );
+    expect(
+      GameContent.shopItemsForNpc('shaurmek').single.requiredQuestId,
+      'q_shawarma_for_ilya',
+    );
+    expect(
+      GameContent.quests.map((quest) => quest.id),
+      containsAll(<String>[
+        'q_doner_classic',
+        'q_doner_spicy',
+        'q_doner_signature',
+        'q_shawarma_for_ilya',
+        'q_potato_bridge',
+        'q_kartofla_videos',
+      ]),
+    );
   });
 
   test(

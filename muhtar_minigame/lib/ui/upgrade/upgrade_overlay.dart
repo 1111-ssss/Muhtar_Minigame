@@ -69,7 +69,16 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
     }
   }
 
-  void _purchase(bool Function() action) {
+  void _purchase(String itemId) {
+    final purchased = widget.game.gameState.buyShopItem(itemId);
+    if (purchased && itemId == 'shaurma') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.game.openShawarmaChoice();
+      });
+    }
+  }
+
+  void _purchaseUpgrade(bool Function() action) {
     action();
   }
 
@@ -163,6 +172,7 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
                   ? switch (widget.shopNpcId) {
                       'baba_galya' => 'Магазин Бабы Гали',
                       'alenka' => 'Копеечка · магазин',
+                      'shaurmek' => 'Донер · магазин Шаурмека',
                       _ => 'Шоп Арианы',
                     }
                   : 'Инвентарь',
@@ -197,6 +207,7 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
                         state: state,
                         npcId: widget.shopNpcId ?? 'ariana',
                         onPurchase: _purchase,
+                        onUpgrade: _purchaseUpgrade,
                       ),
                       const SizedBox(height: 8),
                     ],
@@ -506,10 +517,12 @@ class _ShopGrid extends StatelessWidget {
     required this.state,
     required this.npcId,
     required this.onPurchase,
+    required this.onUpgrade,
   });
   final GameState state;
   final String npcId;
-  final void Function(bool Function()) onPurchase;
+  final ValueChanged<String> onPurchase;
+  final void Function(bool Function()) onUpgrade;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -537,7 +550,7 @@ class _ShopGrid extends StatelessWidget {
               _ShopItemPurchase(
                 item: item,
                 state: state,
-                onBuy: () => onPurchase(() => state.buyShopItem(item.id)),
+                onBuy: () => onPurchase(item.id),
               ),
           ],
         );
@@ -560,7 +573,7 @@ class _ShopGrid extends StatelessWidget {
             icon: Icons.inventory_2_outlined,
             price: GameState.caseCost,
             onBuy: state.coins >= GameState.caseCost
-                ? () => onPurchase(state.buyCase)
+                ? () => onUpgrade(state.buyCase)
                 : null,
           ),
           _Purchase(
@@ -573,7 +586,7 @@ class _ShopGrid extends StatelessWidget {
             onBuy:
                 state.dicePerTurn < GameState.maxDicePerTurn &&
                     state.coins >= state.diceUpgradeCost
-                ? () => onPurchase(state.upgradeDicePerTurn)
+                ? () => onUpgrade(state.upgradeDicePerTurn)
                 : null,
           ),
           _Purchase(
@@ -585,7 +598,7 @@ class _ShopGrid extends StatelessWidget {
             onBuy:
                 state.rerollsPerRound < 6 &&
                     state.coins >= state.rerollUpgradeCost
-                ? () => onPurchase(state.upgradeRerolls)
+                ? () => onUpgrade(state.upgradeRerolls)
                 : null,
           ),
         ],

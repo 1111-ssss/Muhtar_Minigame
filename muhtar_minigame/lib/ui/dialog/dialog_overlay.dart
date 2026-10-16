@@ -45,6 +45,24 @@ class _DialogOverlayState extends State<DialogOverlay>
     if (node == null) return const [];
     return node.choices
         .where((choice) {
+          final requiredQuestId = choice.requiredQuestId;
+          if (requiredQuestId != null) {
+            final progress = widget.game.gameState.quest(requiredQuestId);
+            if (progress == null ||
+                (choice.requiredQuestStates.isNotEmpty &&
+                    !choice.requiredQuestStates.contains(progress.state))) {
+              return false;
+            }
+          }
+          final requiredEnemyId = choice.requiredEnemyId;
+          final requiredLocationId = choice.requiredLocationId;
+          if (requiredEnemyId != null && requiredLocationId != null &&
+              !widget.game.gameState.hasDefeatedEnemyAt(
+                requiredLocationId,
+                requiredEnemyId,
+              )) {
+            return false;
+          }
           final questId = choice.questId;
           if (questId != null) {
             final npcId = widget.game.talkingNpc?.npcId;
@@ -73,7 +91,10 @@ class _DialogOverlayState extends State<DialogOverlay>
       return node.text;
     }
     final state = widget.game.gameState.quest(questId)?.state;
-    return node.textByQuestState[state] ?? node.text;
+    final outcome = widget.game.gameState.shawarmaOutcome;
+    return node.textByShawarmaOutcome[outcome] ??
+        node.textByQuestState[state] ??
+        node.text;
   }
 
   @override
@@ -395,6 +416,25 @@ class _DialogOverlayState extends State<DialogOverlay>
         _closing = true;
         widget.game.overlays.remove(MuhtarGame.overlayDialog);
         widget.game.openSongMiniGame();
+        return;
+      }
+
+      if (choice.openDonerGame) {
+        _typingTimer?.cancel();
+        _closing = true;
+        widget.game.overlays.remove(MuhtarGame.overlayDialog);
+        widget.game.openDonerAssembly(
+          questId: choice.donerQuestId ?? choice.questId!,
+          recipeId: choice.donerRecipeId ?? 'classic',
+        );
+        return;
+      }
+
+      if (choice.openVideoSequence) {
+        _typingTimer?.cancel();
+        _closing = true;
+        widget.game.overlays.remove(MuhtarGame.overlayDialog);
+        widget.game.openVideoSequence();
         return;
       }
 

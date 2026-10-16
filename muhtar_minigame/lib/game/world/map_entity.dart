@@ -176,8 +176,10 @@ abstract class MapEntity extends PositionComponent {
           paint,
           bodyColor: const Color(0xFF343A52),
           accentColor: const Color(0xFF78F3D0),
-          skinTone: const Color(0xFFE8B89A),
-        );
+           skinTone: const Color(0xFFE8B89A),
+         );
+      case 'kartofla':
+        _renderKartofla(canvas, paint);
       default:
         _renderHumanoid(canvas, paint);
     }
@@ -191,6 +193,29 @@ abstract class MapEntity extends PositionComponent {
         _renderRibka(canvas, paint);
       case 'sofia':
         _renderSofia(canvas, paint);
+      case 'shaurmek':
+        _renderShaurmek(canvas, paint);
+      case 'wb_employee':
+        _renderHumanoid(
+          canvas,
+          paint,
+          bodyColor: const Color(0xFF8B4FC8),
+          accentColor: const Color(0xFFE0B4FF),
+        );
+      case 'ilya':
+        _renderHumanoid(
+          canvas,
+          paint,
+          bodyColor: const Color(0xFF2D7D9A),
+          accentColor: const Color(0xFF7DE0F2),
+        );
+      case 'ozon_locker':
+        _renderHumanoid(
+          canvas,
+          paint,
+          bodyColor: const Color(0xFF147A8A),
+          accentColor: const Color(0xFF62E6E8),
+        );
       default:
         _renderHumanoid(canvas, paint, hood: true);
     }
@@ -359,5 +384,22 @@ abstract class MapEntity extends PositionComponent {
     canvas.drawRect(const Rect.fromLTWH(-14, -28, 28, 5), paint);
     paint.color = const Color(0xFFB9D36A);
     canvas.drawRect(const Rect.fromLTWH(-17, -1, 4, 11), paint);
+  }
+
+  void _renderKartofla(Canvas canvas, Paint paint) {
+    _renderHumanoid(
+      canvas,
+      paint,
+      bodyColor: const Color(0xFF9B673C),
+      skinTone: const Color(0xFFD69A5D),
+      accentColor: const Color(0xFFF1C66B),
+    );
+    paint.color = const Color(0xFF6F472F);
+    canvas.drawRect(const Rect.fromLTWH(-10, -29, 20, 5), paint);
+    paint.color = const Color(0xFFF1C66B);
+    canvas.drawRect(const Rect.fromLTWH(-9, -12, 18, 4), paint);
+    paint.color = const Color(0xFF553522);
+    canvas.drawRect(const Rect.fromLTWH(-6, -21, 3, 3), paint);
+    canvas.drawRect(const Rect.fromLTWH(3, -21, 3, 3), paint);
   }
 }

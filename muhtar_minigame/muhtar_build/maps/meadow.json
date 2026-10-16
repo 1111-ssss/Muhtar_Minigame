@@ -226,11 +226,6 @@
   ],
   "enemies": [
     {
-      "enemyId": "shaurmek",
-      "col": 10,
-      "row": 8
-    },
-    {
       "enemyId": "viktor_korneplod",
       "col": 13,
       "row": 4

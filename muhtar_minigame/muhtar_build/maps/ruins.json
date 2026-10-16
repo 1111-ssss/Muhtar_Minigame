@@ -26,7 +26,8 @@
     {"id": "ruins_tree_3_1", "kind": "tree", "col": 3, "row": 1, "width": 1, "height": 1, "blocksMovement": true, "variant": 0, "searchable": false},
     {"id": "ruins_tree_7_6", "kind": "tree", "col": 7, "row": 6, "width": 1, "height": 1, "blocksMovement": true, "variant": 1, "searchable": false},
     {"id": "ruins_bush_5_2", "kind": "bush", "col": 5, "row": 2, "width": 1, "height": 1, "blocksMovement": true, "variant": 0, "searchable": false},
-    {"id": "ruins_bush_10_5", "kind": "bush", "col": 10, "row": 5, "width": 1, "height": 1, "blocksMovement": true, "variant": 1, "searchable": false}
+    {"id": "ruins_bush_10_5", "kind": "bush", "col": 10, "row": 5, "width": 1, "height": 1, "blocksMovement": true, "variant": 1, "searchable": false},
+    {"id": "bridge_potato", "kind": "rock", "col": 17, "row": 2, "width": 1, "height": 1, "blocksMovement": false, "variant": 2, "searchable": true, "specialItemId": "potato"}
   ],
   "outsideTile": 6,
   "outsideGroundRegions": [

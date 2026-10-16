@@ -14,6 +14,8 @@ class ShopItem {
     this.amount = 0,
     this.itemId,
     this.requiredQuestId,
+    this.requiredEnemyId,
+    this.requiredLocationId,
   });
 
   final String id;
@@ -25,4 +27,6 @@ class ShopItem {
   final int amount;
   final String? itemId;
   final String? requiredQuestId;
+  final String? requiredEnemyId;
+  final String? requiredLocationId;
 }

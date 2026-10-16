@@ -32,10 +32,20 @@ class PlayerSkin {
     portraitKey: 'player_ribka_reward',
   );
 
+  static const PlayerSkin kartoflaSkin = PlayerSkin(
+    id: 'kartofla',
+    name: 'Картофля',
+    portraitKey: 'player_kartofla',
+  );
+
   static const PlayerSkin rewardSkin = ribkaRewardSkin;
   static const PlayerSkin ribkaReward = ribkaRewardSkin;
 
-  static const List<PlayerSkin> catalog = [defaultSkin, ribkaRewardSkin];
+  static const List<PlayerSkin> catalog = [
+    defaultSkin,
+    ribkaRewardSkin,
+    kartoflaSkin,
+  ];
 
   static PlayerSkin? byId(String id) {
     for (final skin in catalog) {

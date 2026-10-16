@@ -26,7 +26,6 @@ class Locations {
     npcs: [NpcSpawn('ariana', 'Ариана', 2, 8)],
     exits: [LocationExit(col: 15, row: 6, targetId: 'forest', arrival: (1, 5))],
     enemies: [
-      EnemySpawn('shaurmek', 10, 8),
       EnemySpawn('viktor_korneplod', 13, 4),
     ],
     props: [
@@ -326,6 +325,16 @@ class Locations {
       LocationProp(kind: LocationPropKind.tree, col: 7, row: 6, variant: 1),
       LocationProp(kind: LocationPropKind.bush, col: 5, row: 2, variant: 0),
       LocationProp(kind: LocationPropKind.bush, col: 10, row: 5, variant: 1),
+      LocationProp(
+        id: 'bridge_potato',
+        kind: LocationPropKind.rock,
+        col: 17,
+        row: 2,
+        blocksMovement: false,
+        searchable: true,
+        specialItemId: 'potato',
+        variant: 2,
+      ),
     ],
     exits: [
       LocationExit(col: 0, row: 3, targetId: 'forest', arrival: (20, 5)),
@@ -347,7 +356,8 @@ class Locations {
     ],
   );
 
-  /// Площадка Донера на карте «Конь». Персонажи будут добавлены позже.
+  /// Интерьер Донера: после боя Шаурмек остаётся за стойкой и открывает
+  /// задания на сборку шаурмы и магазин.
   static const LocationDef doner = LocationDef(
     id: 'doner',
     name: 'Донер (шаурмечная)',
@@ -362,6 +372,45 @@ class Locations {
       [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     ],
     spawn: (8, 4),
+    enemies: [EnemySpawn('shaurmek', 6, 4)],
+    npcs: [NpcSpawn('shaurmek', 'Шаурмек', 7, 2)],
+    props: [
+      LocationProp(
+        id: 'doner_counter',
+        kind: LocationPropKind.platform,
+        col: 5,
+        row: 1,
+        width: 4,
+        blocksMovement: false,
+        variant: 1,
+      ),
+      LocationProp(
+        id: 'doner_grill',
+        kind: LocationPropKind.platform,
+        col: 2,
+        row: 2,
+        width: 2,
+        blocksMovement: false,
+        variant: 2,
+      ),
+      LocationProp(
+        id: 'doner_table',
+        kind: LocationPropKind.bench,
+        col: 6,
+        row: 5,
+        width: 2,
+        blocksMovement: false,
+        variant: 1,
+      ),
+      LocationProp(
+        id: 'doner_trash',
+        kind: LocationPropKind.trashBin,
+        col: 10,
+        row: 2,
+        blocksMovement: false,
+        variant: 1,
+      ),
+    ],
     exits: [LocationExit(col: 0, row: 4, targetId: 'horse', arrival: (5, 1))],
   );
 
@@ -379,6 +428,7 @@ class Locations {
       [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     ],
     spawn: (1, 5),
+    npcs: [NpcSpawn('ilya', 'Илья', 5, 3)],
     exits: [LocationExit(col: 0, row: 5, targetId: 'horse', arrival: (14, 2))],
   );
 
@@ -413,7 +463,47 @@ class Locations {
       [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     ],
     spawn: (1, 2),
+    npcs: [NpcSpawn('wb_employee', 'Сотрудник ПВЗ', 6, 3)],
     exits: [LocationExit(col: 0, row: 2, targetId: 'horse', arrival: (10, 6))],
+  );
+
+  /// Озон с отдельной раздевалкой. Три ролика запускаются через NPC,
+  /// чтобы действие было заметно на карте и не зависело от скрытого тапа.
+  static const LocationDef ozon = LocationDef(
+    id: 'ozon',
+    name: 'Озон',
+    tiles: [
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 2, 2, 2, 2, 2, 2, 2, 2, 0, 1],
+      [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 10, 10, 0, 0, 0, 10, 10, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    ],
+    spawn: (2, 3),
+    npcs: [NpcSpawn('ozon_locker', 'Раздевалка', 8, 3)],
+    props: [
+      LocationProp(
+        id: 'ozon_counter',
+        kind: LocationPropKind.platform,
+        col: 2,
+        row: 1,
+        width: 3,
+        blocksMovement: false,
+        variant: 1,
+      ),
+      LocationProp(
+        id: 'ozon_fitting_room',
+        kind: LocationPropKind.platform,
+        col: 7,
+        row: 1,
+        width: 3,
+        blocksMovement: false,
+        variant: 2,
+      ),
+    ],
+    exits: [LocationExit(col: 0, row: 3, targetId: 'horse', arrival: (10, 6))],
   );
 
   /// Расширенная площадка для телепорта «Конь» без водяной рамки.
@@ -421,7 +511,7 @@ class Locations {
     id: 'horse',
     name: 'Конь',
     tiles: [
-      [9, 9, 9, 9, 9, 4, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+      [9, 9, 9, 9, 9, 4, 9, 9, 9, 9, 4, 9, 9, 9, 9, 9],
       [9, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9],
       [9, 9, 9, 0, 2, 2, 2, 2, 2, 2, 2, 0, 9, 9, 9, 4],
       [9, 9, 9, 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 9, 9, 9],
@@ -472,6 +562,13 @@ class Locations {
         targetId: 'wb',
         arrival: (1, 2),
         direction: ExitDirection.down,
+      ),
+      LocationExit(
+        col: 10,
+        row: 0,
+        targetId: 'ozon',
+        arrival: (1, 3),
+        direction: ExitDirection.up,
       ),
     ],
   );
@@ -576,6 +673,7 @@ class Locations {
     college,
     dormitory,
     wb,
+    ozon,
     kopeechka,
     cheburechnaya,
   ];

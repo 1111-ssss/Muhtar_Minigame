@@ -92,6 +92,19 @@ class GameContent {
       effect: ShopEffect.damage,
       amount: 5,
     ),
+    ShopItem(
+      id: 'shaurma',
+      npcId: 'shaurmek',
+      title: 'Шаурма',
+      description:
+          'Свежая шаурма от поверженного Шаурмека. Доступна только по заданию Ильи.',
+      price: 20,
+      effect: ShopEffect.addItem,
+      itemId: 'shaurma',
+      requiredQuestId: 'q_shawarma_for_ilya',
+      requiredEnemyId: 'shaurmek',
+      requiredLocationId: 'doner',
+    ),
   ];
 
   static ShopItem? shopItemById(String id) {
@@ -367,8 +380,8 @@ class GameContent {
         id: 'briefing',
         text:
             'Иди через Парк к Мосту. На правом краю Моста два входа в одно '
-            'здание: Копеечка и Чебуречная. В Копеечке засел Шаурмек, а '
-            'Виктор Корнеплод караулит рядом.',
+            'здание: Копеечка и Чебуречная. За отдельным переходом к Донеру '
+            'засел Шаурмек, а Виктор Корнеплод караулит рядом.',
         choices: [
           DialogueChoice(
             label: 'Принять маршрут через Парк к Мосту',
@@ -389,7 +402,7 @@ class GameContent {
       DialogueNode(
         id: 'bridge',
         text:
-            'Сначала доберись до Моста через Парк. Затем проверь Копеечку: '
+            'Сначала доберись до Моста через Парк. Затем проверь Донер: '
             'Шаурмек не должен сорвать доставку. Если справишься, разберись '
             'с Виктором Корнеплодом и возвращайся ко мне.',
         choices: [
@@ -458,6 +471,202 @@ class GameContent {
         text: 'Здравствуйте! Копеечка к вашим услугам. Что будете брать?',
         choices: [
           DialogueChoice(label: 'Открыть магазин Копеечки', openShop: true),
+          DialogueChoice(label: 'До встречи'),
+        ],
+      ),
+    ],
+  );
+
+  static const DialogueTree shaurmekDialogue = DialogueTree(
+    startNodeId: 'greeting',
+    nodes: [
+      DialogueNode(
+        id: 'greeting',
+        text:
+            'Вай, герой! Теперь Донер снова работает. Соберём пару шаурм и '
+            'поговорим о покупке для Ильи.',
+        choices: [
+          DialogueChoice(
+            label: 'Задание 1: собрать классическую шаурму',
+            questId: 'q_doner_classic',
+            donerQuestId: 'q_doner_classic',
+            donerRecipeId: 'classic',
+            openDonerGame: true,
+            requiredEnemyId: 'shaurmek',
+            requiredLocationId: 'doner',
+            notification: 'Задание принято: Классическая шаурма',
+          ),
+          DialogueChoice(
+            label: 'Задание 2: собрать острую шаурму',
+            questId: 'q_doner_spicy',
+            donerQuestId: 'q_doner_spicy',
+            donerRecipeId: 'spicy',
+            openDonerGame: true,
+            requiredEnemyId: 'shaurmek',
+            requiredLocationId: 'doner',
+            notification: 'Задание принято: Острая шаурма',
+          ),
+          DialogueChoice(
+            label: 'Задание 3: фирменный свёрток',
+            questId: 'q_doner_signature',
+            donerQuestId: 'q_doner_signature',
+            donerRecipeId: 'signature',
+            openDonerGame: true,
+            requiredEnemyId: 'shaurmek',
+            requiredLocationId: 'doner',
+            notification: 'Задание принято: Фирменный свёрток',
+          ),
+          DialogueChoice(
+            label: 'Продолжить классическую шаурму',
+            requiredQuestId: 'q_doner_classic',
+            requiredQuestStates: {QuestState.active},
+            donerQuestId: 'q_doner_classic',
+            donerRecipeId: 'classic',
+            openDonerGame: true,
+          ),
+          DialogueChoice(
+            label: 'Продолжить острую шаурму',
+            requiredQuestId: 'q_doner_spicy',
+            requiredQuestStates: {QuestState.active},
+            donerQuestId: 'q_doner_spicy',
+            donerRecipeId: 'spicy',
+            openDonerGame: true,
+          ),
+          DialogueChoice(
+            label: 'Продолжить фирменный свёрток',
+            requiredQuestId: 'q_doner_signature',
+            requiredQuestStates: {QuestState.active},
+            donerQuestId: 'q_doner_signature',
+            donerRecipeId: 'signature',
+            openDonerGame: true,
+          ),
+          DialogueChoice(
+            label: 'Купить шаурму для Ильи',
+            openShop: true,
+            requiredQuestId: 'q_shawarma_for_ilya',
+            requiredQuestStates: {QuestState.active},
+            requiredEnemyId: 'shaurmek',
+            requiredLocationId: 'doner',
+          ),
+          DialogueChoice(label: 'До встречи'),
+        ],
+      ),
+    ],
+  );
+
+  static const DialogueTree ilyaDialogue = DialogueTree(
+    startNodeId: 'greeting',
+    nodes: [
+      DialogueNode(
+        id: 'greeting',
+        text: 'Мне нужна шаурма от Шаурмека. Принесёшь её из Донера?',
+        textQuestId: 'q_shawarma_for_ilya',
+        textByQuestState: {
+          QuestState.active:
+              'Купи шаурму у Шаурмека в Донере. Если не передумаешь — принеси её мне.',
+          QuestState.completed: 'Ну что, с шаурмой разобрался?',
+          QuestState.claimed: 'Ну что, с шаурмой разобрался?',
+        },
+        textByShawarmaOutcome: {
+          'eaten': 'Я просил принести шаурму, а ты съел её сам. Ладно, бывает.',
+          'delivered': 'Вот это сервис! Спасибо за шаурму, она дошла целой.',
+        },
+        choices: [
+          DialogueChoice(
+            label: 'Взять задание: купить шаурму у Шаурмека',
+            questId: 'q_shawarma_for_ilya',
+            notification: 'Задание принято: Шаурма для Ильи',
+          ),
+          DialogueChoice(
+            label: 'Передать шаурму Илье',
+            completeQuestId: 'q_shawarma_for_ilya',
+            notification: 'Шаурма передана Илье!',
+          ),
+          DialogueChoice(label: 'До встречи'),
+        ],
+      ),
+    ],
+  );
+
+  static const DialogueTree wbEmployeeDialogue = DialogueTree(
+    startNodeId: 'greeting',
+    nodes: [
+      DialogueNode(
+        id: 'greeting',
+        text: 'На Мосту завалялась картошка. Найдите её и принесите мне.',
+        choices: [
+          DialogueChoice(
+            label: 'Взять задание: найти картошку на Мосту',
+            questId: 'q_potato_bridge',
+            nextNodeId: 'accepted',
+            notification: 'Задание принято: картошка на Мосту',
+          ),
+          DialogueChoice(
+            label: 'Принести картошку',
+            completeQuestId: 'q_potato_bridge',
+            nextNodeId: 'returned',
+            notification: 'Картошка передана сотруднику ПВЗ!',
+          ),
+          DialogueChoice(label: 'До встречи'),
+        ],
+      ),
+      DialogueNode(
+        id: 'accepted',
+        text: 'Ищите картошку среди травы на Мосту и возвращайтесь сюда.',
+        choices: [
+          DialogueChoice(
+            label: 'Принести картошку',
+            completeQuestId: 'q_potato_bridge',
+            nextNodeId: 'returned',
+            notification: 'Картошка передана сотруднику ПВЗ!',
+          ),
+          DialogueChoice(label: 'До встречи'),
+        ],
+      ),
+      DialogueNode(
+        id: 'returned',
+        text: 'Забирайте свои вонючие носки.',
+        choices: [
+          DialogueChoice(
+            label: 'Я батю депнуууул!',
+            nextNodeId: 'final',
+          ),
+        ],
+      ),
+      DialogueNode(
+        id: 'final',
+        text: 'Сотрудник ПВЗ молча возвращается за стойку.',
+        choices: [DialogueChoice(label: 'Закрыть')],
+      ),
+    ],
+  );
+
+  static const DialogueTree ozonLockerDialogue = DialogueTree(
+    startNodeId: 'greeting',
+    nodes: [
+      DialogueNode(
+        id: 'greeting',
+        text: 'Раздевалка Озона. Три ролика подряд откроют редкий скин.',
+        textQuestId: 'q_kartofla_videos',
+        textByQuestState: {
+          QuestState.active:
+              'Ролики нельзя пропустить. Если закрыть окно, просмотр начнётся с первого ролика.',
+          QuestState.completed: 'Скин «Картофля» уже разблокирован.',
+          QuestState.claimed: 'Скин «Картофля» уже разблокирован.',
+        },
+        choices: [
+          DialogueChoice(
+            label: 'Взять задание и смотреть ролики',
+            questId: 'q_kartofla_videos',
+            openVideoSequence: true,
+            notification: 'Задание принято: три ролика в раздевалке Озона',
+          ),
+          DialogueChoice(
+            label: 'Продолжить просмотр',
+            requiredQuestId: 'q_kartofla_videos',
+            requiredQuestStates: {QuestState.active},
+            openVideoSequence: true,
+          ),
           DialogueChoice(label: 'До встречи'),
         ],
       ),
@@ -610,7 +819,7 @@ class GameContent {
     Quest(
       id: 'q_shaurmek',
       title: 'Горячая точка',
-      description: 'Победите Шаурмека в Копеечке на Мосту.',
+      description: 'Победите Шаурмека в Донере.',
       type: QuestType.kill,
       enemyId: 'shaurmek',
       target: 1,
@@ -675,6 +884,80 @@ class GameContent {
       artifactCaseReward: 0,
       skinRewardId: 'ribka_reward',
     ),
+    Quest(
+      id: 'q_doner_classic',
+      title: 'Донер: классика',
+      description: 'Соберите классическую шаурму из четырёх компонентов.',
+      type: QuestType.miniGame,
+      miniGameId: 'doner_classic',
+      acceptanceNpcId: 'shaurmek',
+      target: 1,
+      coinReward: 18,
+      xpReward: 8,
+      artifactCaseReward: 0,
+    ),
+    Quest(
+      id: 'q_doner_spicy',
+      title: 'Донер: огонь',
+      description: 'Соберите острую шаурму и не перепутайте соус.',
+      type: QuestType.miniGame,
+      miniGameId: 'doner_spicy',
+      acceptanceNpcId: 'shaurmek',
+      target: 1,
+      coinReward: 22,
+      xpReward: 10,
+      artifactCaseReward: 0,
+    ),
+    Quest(
+      id: 'q_doner_signature',
+      title: 'Донер: фирменный свёрток',
+      description: 'Повторите фирменную сборку Шаурмека.',
+      type: QuestType.miniGame,
+      miniGameId: 'doner_signature',
+      acceptanceNpcId: 'shaurmek',
+      target: 1,
+      coinReward: 28,
+      xpReward: 12,
+      artifactCaseReward: 0,
+    ),
+    Quest(
+      id: 'q_shawarma_for_ilya',
+      title: 'Шаурма для Ильи',
+      description:
+          'Возьмите задание у Ильи, купите шаурму у победившего Шаурмека и решите, что с ней сделать.',
+      type: QuestType.deliverItem,
+      itemId: 'shaurma',
+      acceptanceNpcId: 'ilya',
+      target: 1,
+      coinReward: 40,
+      xpReward: 18,
+      artifactCaseReward: 0,
+    ),
+    Quest(
+      id: 'q_potato_bridge',
+      title: 'Картошка на Мосту',
+      description: 'Найдите картошку на Мосту и принесите сотруднику ПВЗ.',
+      type: QuestType.deliverItem,
+      itemId: 'potato',
+      acceptanceNpcId: 'wb_employee',
+      target: 1,
+      coinReward: 30,
+      xpReward: 16,
+      artifactCaseReward: 0,
+    ),
+    Quest(
+      id: 'q_kartofla_videos',
+      title: 'Картофля',
+      description: 'Посмотрите три ролика подряд в раздевалке Озона.',
+      type: QuestType.miniGame,
+      miniGameId: 'kartofla_videos',
+      acceptanceNpcId: 'ozon_locker',
+      target: 1,
+      coinReward: 0,
+      xpReward: 0,
+      artifactCaseReward: 0,
+      skinRewardId: 'kartofla',
+    ),
   ];
 
   static EnemyArchetype? enemyById(String id) {
@@ -688,6 +971,10 @@ class GameContent {
     if (npcId == 'ariana') return arianaDialogue;
     if (npcId == 'baba_galya') return babaGalyaDialogue;
     if (npcId == 'alenka') return alenkaDialogue;
+    if (npcId == 'shaurmek') return shaurmekDialogue;
+    if (npcId == 'ilya') return ilyaDialogue;
+    if (npcId == 'wb_employee') return wbEmployeeDialogue;
+    if (npcId == 'ozon_locker') return ozonLockerDialogue;
     if (npcId == 'malek') return malekDialogue;
     if (npcId == 'ribka') return ribkaDialogue;
     if (npcId == 'sofia') return sofiaDialogue;

@@ -392,12 +392,15 @@ class _SearchOverlayState extends State<SearchOverlay>
     }
   }
 
-  static String _propLabel(LocationProp prop) => switch (prop.kind) {
-    LocationPropKind.bush => 'ЗАРОСЛИ',
-    LocationPropKind.trashBin => 'МУСОРНЫЙ БАК',
-    LocationPropKind.bench => 'СКАМЕЙКА',
-    _ => 'ОБЪЕКТ НА КАРТЕ',
-  };
+  static String _propLabel(LocationProp prop) {
+    if (prop.specialItemId == 'potato') return 'КАРТОШКА';
+    return switch (prop.kind) {
+      LocationPropKind.bush => 'ЗАРОСЛИ',
+      LocationPropKind.trashBin => 'МУСОРНЫЙ БАК',
+      LocationPropKind.bench => 'СКАМЕЙКА',
+      _ => 'ОБЪЕКТ НА КАРТЕ',
+    };
+  }
 }
 
 class _Header extends StatelessWidget {
@@ -472,6 +475,8 @@ class _IllustrationButton extends StatelessWidget {
     button: true,
     label: completed
         ? 'Найденная награда'
+        : prop.specialItemId == 'potato'
+        ? 'Осмотреть картошку'
         : 'Осмотреть ${prop.kind == LocationPropKind.trashBin ? 'мусорный бак' : 'куст'}',
     child: Material(
       color: Colors.transparent,

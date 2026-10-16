@@ -479,6 +479,11 @@ class IsometricMap extends Component {
     final position = _propCenter(prop);
     final paint = Paint()..isAntiAlias = false;
     canvas.save();
+    if (prop.specialItemId == 'potato') {
+      _renderPotatoProp(canvas, position, paint);
+      canvas.restore();
+      return;
+    }
     switch (prop.kind) {
       case LocationPropKind.tree:
         final treeVariant = prop.variant % 3;
@@ -626,6 +631,41 @@ class IsometricMap extends Component {
         _renderTrashBin(canvas, position, prop.variant);
     }
     canvas.restore();
+  }
+
+  void _renderPotatoProp(Canvas canvas, Vector2 position, Paint paint) {
+    paint.color = const Color(0x550F1A12);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(position.x + 2, position.y + 7),
+        width: 30,
+        height: 10,
+      ),
+      paint,
+    );
+    paint.color = const Color(0xFFC98A4B);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(position.x, position.y - 8),
+        width: 26,
+        height: 20,
+      ),
+      paint,
+    );
+    paint.color = const Color(0xFFE3B56C);
+    canvas.drawRect(
+      Rect.fromLTWH(position.x - 7, position.y - 12, 4, 3),
+      paint,
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(position.x + 5, position.y - 4, 3, 3),
+      paint,
+    );
+    paint.color = const Color(0xFF5D3D2A);
+    canvas.drawRect(
+      Rect.fromLTWH(position.x - 3, position.y - 16, 3, 3),
+      paint,
+    );
   }
 
   /// Визуальный городской мусорный бак. Он остаётся декоративным даже если

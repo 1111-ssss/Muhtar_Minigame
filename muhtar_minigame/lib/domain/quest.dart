@@ -1,7 +1,14 @@
 import 'package:flutter/foundation.dart';
 
 /// Задание. Тип цели определяет, как считается прогресс.
-enum QuestType { kill, collect, location, deliverItem, miniGame }
+enum QuestType {
+  kill,
+  collect,
+  location,
+  deliverItem,
+  purchaseItem,
+  miniGame,
+}
 
 enum QuestState { notStarted, active, completed, claimed }
 

@@ -20,7 +20,10 @@ import 'dialog/dialog_overlay.dart';
 import 'hud/hud_overlay.dart';
 import 'notifications/notifications_overlay.dart';
 import 'quest/quest_overlay.dart';
+import 'quest/doner_assembly_overlay.dart';
 import 'quest/song_minigame_overlay.dart';
+import 'quest/shawarma_choice_overlay.dart';
+import 'quest/video_sequence_overlay.dart';
 import 'search/search_overlay.dart';
 import 'transition/location_transition_overlay.dart';
 import 'upgrade/upgrade_overlay.dart';
@@ -326,6 +329,19 @@ class GameView extends StatelessWidget {
                 onSolved: game.completeSongMiniGame,
                 onClose: game.closeSongMiniGame,
               ),
+          MuhtarGame.overlayDonerAssembly: (context, MuhtarGame game) =>
+              DonerAssemblyOverlay(
+                recipeId: game.donerRecipeId ?? 'classic',
+                onSolved: game.completeDonerAssembly,
+                onClose: game.closeDonerAssembly,
+              ),
+          MuhtarGame.overlayVideoSequence: (context, MuhtarGame game) =>
+              VideoSequenceOverlay(
+                onCompleted: game.completeVideoSequence,
+                onClose: game.closeVideoSequence,
+              ),
+          MuhtarGame.overlayShawarmaChoice: (context, MuhtarGame game) =>
+              ShawarmaChoiceOverlay(onChoice: game.chooseShawarma),
           MuhtarGame.overlayUpgrade: (context, MuhtarGame game) =>
               UpgradeOverlay(game, shop: true, shopNpcId: game.activeShopNpcId),
           MuhtarGame.overlayInventory: (context, MuhtarGame game) =>

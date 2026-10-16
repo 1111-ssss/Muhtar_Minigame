@@ -267,6 +267,53 @@ void main() {
       expect(state.completeDeliveryQuest('q_alpen_gold'), isFalse);
     });
 
+    test('шаурму нельзя купить без задания и победы над Шаурмеком', () {
+      final state = GameState();
+      expect(state.activateQuest('q_shawarma_for_ilya', npcId: 'ilya'), isTrue);
+      expect(state.buyShopItem('shaurma'), isFalse);
+
+      state.markEnemyDefeated('doner:shaurmek:6:4');
+      expect(state.buyShopItem('shaurma'), isTrue);
+      expect(state.hasItem('shaurma'), isTrue);
+      expect(state.hasPurchasedShopItem('shaurma'), isTrue);
+    });
+
+    test('выбор после покупки шаурмы меняет исход для Ильи', () {
+      final delivered = GameState();
+      delivered.activateQuest('q_shawarma_for_ilya', npcId: 'ilya');
+      delivered.markEnemyDefeated('doner:shaurmek:6:4');
+      delivered.buyShopItem('shaurma');
+      expect(delivered.resolveShawarmaChoice(eat: false), isTrue);
+      expect(delivered.shawarmaOutcome, 'forIlya');
+      expect(delivered.completeDeliveryQuest('q_shawarma_for_ilya'), isTrue);
+      expect(delivered.shawarmaOutcome, 'delivered');
+
+      final eaten = GameState();
+      eaten.activateQuest('q_shawarma_for_ilya', npcId: 'ilya');
+      eaten.markEnemyDefeated('doner:shaurmek:6:4');
+      eaten.buyShopItem('shaurma');
+      expect(eaten.resolveShawarmaChoice(eat: true), isTrue);
+      expect(eaten.shawarmaOutcome, 'eaten');
+      expect(eaten.hasItem('shaurma'), isFalse);
+      expect(eaten.quest('q_shawarma_for_ilya')!.state, QuestState.completed);
+    });
+
+    test('картошка на Мосту становится доставляемым предметом', () {
+      final state = GameState();
+      final potato = Locations.ruins.props.singleWhere(
+        (prop) => prop.specialItemId == 'potato',
+      );
+      state.activateQuest('q_potato_bridge', npcId: 'wb_employee');
+      for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
+        state.searchProp(potato.id);
+      }
+
+      expect(state.hasItem('potato'), isTrue);
+      expect(state.completeDeliveryQuest('q_potato_bridge'), isTrue);
+      expect(state.hasItem('potato'), isFalse);
+      expect(state.quest('q_potato_bridge')!.state, QuestState.completed);
+    });
+
     test(
       'выполненное задание получает награду и больше не показывается активным',
       () {
