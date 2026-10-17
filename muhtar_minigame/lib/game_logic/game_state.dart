@@ -16,7 +16,7 @@ import '../domain/shop_item.dart';
 
 /// Состояние игрока и прогресс. Знает про Flutter только через ChangeNotifier.
 class GameState extends ChangeNotifier {
-  /// Старый лимит API сохранён для миграции; реальные кейсы не ограничивают
+  /// Старый лимит API сохранён для миграции; реальные ящики не ограничивают
   /// размер инвентаря.
   static const int maxDiceCount = 6;
 
@@ -24,6 +24,8 @@ class GameState extends ChangeNotifier {
   static const int maxDicePerTurn = 3;
   static const int maxRerollsPerRound = 6;
   static const int caseCost = 30;
+  static const int maxDiceBoxLevel = 3;
+  static const int maxBushHpReward = 3;
   static const Duration enemyRespawnDelay = Duration(minutes: 5);
 
   GameState({Random? random}) : _random = random ?? Random() {
@@ -49,22 +51,33 @@ class GameState extends ChangeNotifier {
   final Set<String> _defeatedEnemyAccess = {};
   String? _shawarmaOutcome;
   List<Artifact> _pendingArtifactChoices = [];
+  bool _pendingModifierChoice = false;
+  DiceModifier? _pendingModifier;
   final Random _random;
   final Set<String> _ownedSkinIds = {};
   String _selectedSkinId = PlayerSkin.defaultSkin.id;
   final Map<String, int> _searchTaps = {};
   final Map<String, SearchResult> _searchResults = {};
 
-  int caseCount(CaseType type) => _cases[type] ?? 0;
-  void addArtifactCases(int count) {
+  int boxCount(CaseType type) => _cases[type] ?? 0;
+
+  @Deprecated('Используйте boxCount')
+  int caseCount(CaseType type) => boxCount(type);
+
+  void addArtifactBoxes(int count) {
     if (count <= 0) return;
-    _cases[CaseType.artifact] = caseCount(CaseType.artifact) + count;
+    _cases[CaseType.artifact] = boxCount(CaseType.artifact) + count;
     notifyListeners();
   }
+
+  @Deprecated('Используйте addArtifactBoxes')
+  void addArtifactCases(int count) => addArtifactBoxes(count);
 
   Map<Artifact, int> get artifacts => Map.unmodifiable(_artifacts);
   List<Artifact> get pendingArtifactChoices =>
       List.unmodifiable(_pendingArtifactChoices);
+  bool get hasPendingModifierChoice => _pendingModifierChoice;
+  DiceModifier? get pendingModifier => _pendingModifier;
 
   int get coins => _coins;
   int get xp => _xp;
@@ -260,42 +273,144 @@ class GameState extends ChangeNotifier {
   int diceTypeCount(String diceId) =>
       _dice.where((dice) => dice.id == diceId).length;
 
-  /// Покупка не открывает кейс. Он попадает в стопку в инвентаре.
-  bool buyCase() {
+  /// Покупка не открывает ящик. Он попадает в стопку в инвентаре.
+  bool buyDiceBox() {
     if (_coins < caseCost) return false;
     _coins -= caseCost;
-    _cases[CaseType.dice] = caseCount(CaseType.dice) + 1;
+    _cases[CaseType.dice] = boxCount(CaseType.dice) + 1;
     notifyListeners();
     return true;
   }
 
+  @Deprecated('Используйте buyDiceBox')
+  bool buyCase() => buyDiceBox();
+
+  /// Уровни 2–3 из ящика редкие, а уровни 4–6 не выпадают вообще.
+  int _rollDiceBoxLevel() {
+    final roll = _random.nextInt(100);
+    if (roll < 70) return 1;
+    if (roll < 92) return 2;
+    return maxDiceBoxLevel;
+  }
+
   /// Награда фиксируется до анимации: закрытие окна не теряет кость и не
   /// позволяет перебросить результат открытия.
-  Dice? openDiceCase() {
-    if (caseCount(CaseType.dice) == 0) return null;
-    _cases[CaseType.dice] = caseCount(CaseType.dice) - 1;
+  Dice? openDiceBox() {
+    if (boxCount(CaseType.dice) == 0) return null;
+    _cases[CaseType.dice] = boxCount(CaseType.dice) - 1;
     final template = GameContent
         .diceCatalog[_random.nextInt(GameContent.diceCatalog.length)];
-    final result = template.copyWith(level: _random.nextInt(Dice.maxLevel) + 1);
+    final result = template.copyWith(level: _rollDiceBoxLevel());
     _dice.add(result);
     notifyListeners();
     return result;
   }
 
-  List<Artifact> openArtifactCase() {
-    if (_pendingArtifactChoices.isNotEmpty) return pendingArtifactChoices;
-    if (caseCount(CaseType.artifact) == 0) return const [];
-    _cases[CaseType.artifact] = caseCount(CaseType.artifact) - 1;
-    final pool = Artifact.values.toList()..shuffle(_random);
-    _pendingArtifactChoices = pool.take(3).toList();
+  @Deprecated('Используйте openDiceBox')
+  Dice? openDiceCase() => openDiceBox();
+
+  List<Artifact> openArtifactBox() {
+    if (_pendingModifierChoice || _pendingArtifactChoices.isNotEmpty) {
+      return pendingArtifactChoices;
+    }
+    if (boxCount(CaseType.artifact) == 0) return const [];
+    _cases[CaseType.artifact] = boxCount(CaseType.artifact) - 1;
+    _pendingModifierChoice = true;
+    _pendingModifier = null;
+    _pendingArtifactChoices = _rollArtifactChoices();
     notifyListeners();
     return pendingArtifactChoices;
   }
 
+  @Deprecated('Используйте openArtifactBox')
+  List<Artifact> openArtifactCase() => openArtifactBox();
+
+  List<Artifact> _rollArtifactChoices() {
+    final pool = Artifact.values
+        .where((artifact) => artifact.stackable || !_artifacts.containsKey(artifact))
+        .toList();
+    final choices = <Artifact>[];
+    while (pool.isNotEmpty && choices.length < 3) {
+      final totalWeight = pool.fold<int>(
+        0,
+        (total, artifact) => total + artifact.rarity.dropWeight,
+      );
+      var roll = _random.nextInt(totalWeight);
+      var selectedIndex = 0;
+      for (var index = 0; index < pool.length; index++) {
+        roll -= pool[index].rarity.dropWeight;
+        if (roll < 0) {
+          selectedIndex = index;
+          break;
+        }
+      }
+      choices.add(pool.removeAt(selectedIndex));
+    }
+    return choices;
+  }
+
   bool chooseArtifact(Artifact artifact) {
-    if (!_pendingArtifactChoices.contains(artifact)) return false;
-    _artifacts[artifact] = (_artifacts[artifact] ?? 0) + 1;
+    if (_pendingModifier != null || !_pendingArtifactChoices.contains(artifact)) {
+      return false;
+    }
+    if (!artifact.stackable && _artifacts.containsKey(artifact)) return false;
+    _artifacts[artifact] = artifact.stackable
+        ? (_artifacts[artifact] ?? 0) + 1
+        : 1;
     _pendingArtifactChoices = [];
+    _pendingModifierChoice = false;
+    notifyListeners();
+    return true;
+  }
+
+  /// Фиксирует прокрутку списка модификаторов. Результат сохраняется, пока
+  /// игрок не выберет кость, поэтому закрытие окна не даёт новый результат.
+  DiceModifier? rollModifier() {
+    if (!_pendingModifierChoice) return null;
+    _pendingModifier ??= DiceModifier.values
+        .where((modifier) => modifier != DiceModifier.none)
+        .toList()[_random.nextInt(3)];
+    notifyListeners();
+    return _pendingModifier;
+  }
+
+  List<int> get modifierTargetIndexes => [
+    for (var index = 0; index < _dice.length; index++)
+      if (_dice[index].modifier == DiceModifier.none) index,
+  ];
+
+  bool applyPendingModifier(int diceIndex) {
+    final modifier = _pendingModifier;
+    if (modifier == null ||
+        diceIndex < 0 ||
+        diceIndex >= _dice.length ||
+        _dice[diceIndex].modifier != DiceModifier.none) {
+      return false;
+    }
+    _dice[diceIndex] = _dice[diceIndex].copyWith(modifier: modifier);
+    _pendingModifier = null;
+    _pendingModifierChoice = false;
+    _pendingArtifactChoices = [];
+    notifyListeners();
+    return true;
+  }
+
+  bool consumeDice(Dice dice) {
+    final index = _dice.indexOf(dice);
+    if (index < 0) return false;
+    _dice.removeAt(index);
+    notifyListeners();
+    return true;
+  }
+
+  bool replaceDice(Dice before, Dice? after) {
+    final index = _dice.indexOf(before);
+    if (index < 0) return false;
+    if (after == null) {
+      _dice.removeAt(index);
+    } else {
+      _dice[index] = after;
+    }
     notifyListeners();
     return true;
   }
@@ -394,7 +509,9 @@ class GameState extends ChangeNotifier {
     }
     final first = _dice[firstIndex];
     final second = _dice[secondIndex];
-    if (first.ability != second.ability || first.level != second.level) {
+    if (first.ability != second.ability ||
+        first.level != second.level ||
+        first.modifier != second.modifier) {
       return false;
     }
     if (first.level >= Dice.maxLevel) return false;
@@ -492,17 +609,20 @@ class GameState extends ChangeNotifier {
     }
 
     // В кустах добыча небольшая: иногда там вообще ничего нет, а если есть,
-    // это только +1 HP или +5 монет. Редкие кейсы и опыт остаются находками
+    // это только 1–3 HP или +5 монет. Редкие ящики и опыт остаются находками
     // мусорных баков и других будущих searchable-объектов.
     late final (SearchRewardType, int) reward;
     if (prop.kind == LocationPropKind.bush) {
       reward = switch (_random.nextInt(3)) {
         0 => (SearchRewardType.none, 0),
-        1 => (SearchRewardType.hp, 1),
+        1 => (
+          SearchRewardType.hp,
+          _random.nextInt(maxBushHpReward) + 1,
+        ),
         _ => (SearchRewardType.coins, 5),
       };
     } else {
-      // Кейсы должны оставаться редкой находкой: обычный поиск чаще даёт
+      // Ящики должны оставаться редкой находкой: обычный поиск чаще даёт
       // небольшое лечение, монеты или опыт.
       final rareRoll = _random.nextInt(100);
       reward = rareRoll < 2
@@ -524,9 +644,9 @@ class GameState extends ChangeNotifier {
       case SearchRewardType.xp:
         _addXpSilently(reward.$2);
       case SearchRewardType.artifactCase:
-        _cases[CaseType.artifact] = caseCount(CaseType.artifact) + reward.$2;
+        _cases[CaseType.artifact] = boxCount(CaseType.artifact) + reward.$2;
       case SearchRewardType.diceCase:
-        _cases[CaseType.dice] = caseCount(CaseType.dice) + reward.$2;
+        _cases[CaseType.dice] = boxCount(CaseType.dice) + reward.$2;
       case SearchRewardType.item:
       case SearchRewardType.none:
         break;
@@ -684,7 +804,7 @@ class GameState extends ChangeNotifier {
     if (q == null || q.state != QuestState.completed) return false;
     q.state = QuestState.claimed;
     _cases[CaseType.artifact] =
-        caseCount(CaseType.artifact) + q.quest.artifactCaseReward;
+        boxCount(CaseType.artifact) + q.quest.artifactCaseReward;
     _coins += q.quest.coinReward;
     _addXpSilently(q.quest.xpReward);
     final skinRewardId = q.quest.skinRewardId;
@@ -719,6 +839,8 @@ class GameState extends ChangeNotifier {
     'bonusMaxHp': _bonusMaxHp,
     'dicePerTurn': dicePerTurn,
     'rerollsPerRound': rerollsPerRound,
+    'boxes': {for (final entry in _cases.entries) entry.key.name: entry.value},
+    // Старый ключ остаётся для сохранений предыдущих версий.
     'cases': {for (final entry in _cases.entries) entry.key.name: entry.value},
     'artifacts': {
       for (final entry in _artifacts.entries) entry.key.name: entry.value,
@@ -729,6 +851,8 @@ class GameState extends ChangeNotifier {
     'pendingArtifactChoices': [
       for (final artifact in _pendingArtifactChoices) artifact.name,
     ],
+    'pendingModifierChoice': _pendingModifierChoice,
+    'pendingModifier': _pendingModifier?.name,
     'currentLocationId': _currentLocationId,
     'ownedSkins': _ownedSkinIds.toList(),
     'selectedSkinId': _selectedSkinId,
@@ -761,6 +885,7 @@ class GameState extends ChangeNotifier {
             'baseFaces': d.baseFaces,
             'level': d.level,
             'ability': d.ability.name,
+            'modifier': d.modifier.name,
             'visualKey': d.visualKey,
           },
         )
@@ -775,7 +900,7 @@ class GameState extends ChangeNotifier {
 
   void fromJson(Map<String, dynamic> json) {
     _cases.clear();
-    final cases = json['cases'] as Map? ?? const {};
+    final cases = (json['boxes'] as Map?) ?? (json['cases'] as Map?) ?? const {};
     for (final type in CaseType.values) {
       _cases[type] = max(0, (cases[type.name] as int?) ?? 0);
     }
@@ -783,13 +908,24 @@ class GameState extends ChangeNotifier {
     final artifacts = json['artifacts'] as Map? ?? const {};
     for (final artifact in Artifact.values) {
       final count = (artifacts[artifact.name] as int?) ?? 0;
-      if (count > 0) _artifacts[artifact] = count;
+      if (count > 0) {
+        _artifacts[artifact] = artifact.stackable ? count : 1;
+      }
     }
     final pending = json['pendingArtifactChoices'] as List? ?? const [];
     _pendingArtifactChoices = Artifact.values
         .where((artifact) => pending.contains(artifact.name))
         .take(3)
         .toList();
+    _pendingModifierChoice = json['pendingModifierChoice'] == true;
+    final pendingModifierName = json['pendingModifier']?.toString();
+    final pendingModifierValues = DiceModifier.values.where(
+      (modifier) => modifier.name == pendingModifierName,
+    );
+    _pendingModifier = pendingModifierValues.isEmpty
+        ? null
+        : pendingModifierValues.first;
+    if (_pendingModifier != null) _pendingModifierChoice = true;
     _coins = json['coins'] as int? ?? 50;
     _xp = json['xp'] as int? ?? 0;
     _level = json['level'] as int? ?? 1;
@@ -920,6 +1056,10 @@ class GameState extends ChangeNotifier {
         final ability = DiceAbility.values.where(
           (candidate) => candidate.name == abilityName,
         );
+        final modifierName = d['modifier'] as String?;
+        final modifier = DiceModifier.values.where(
+          (candidate) => candidate.name == modifierName,
+        );
         return Dice(
           id: id,
           name: d['name'] as String? ?? template?.name ?? id,
@@ -928,6 +1068,7 @@ class GameState extends ChangeNotifier {
           ability: ability.isEmpty
               ? template?.ability ?? DiceAbility.none
               : ability.first,
+          modifier: modifier.isEmpty ? DiceModifier.none : modifier.first,
           visualKey:
               d['visualKey'] as String? ?? template?.visualKey ?? 'blade',
         );
@@ -976,6 +1117,8 @@ class GameState extends ChangeNotifier {
     _shawarmaOutcome = null;
     _purchasedShopItems.clear();
     _pendingArtifactChoices = [];
+    _pendingModifierChoice = false;
+    _pendingModifier = null;
     _ownedSkinIds
       ..clear()
       ..add(PlayerSkin.defaultSkin.id);
@@ -1002,7 +1145,7 @@ class GameState extends ChangeNotifier {
 
   Future<void> save(String saveDir) {
     final snapshot = jsonEncode(toJson());
-    // Открытие кейса и выбор награды могут вызвать два сейва подряд.
+    // Открытие ящика и выбор награды могут вызвать два сейва подряд.
     // Пишем последовательно, чтобы старый снимок не затёр новый.
     final operation = _saveQueue.then((_) async {
       final file = File(p.join(saveDir, 'save.json'));

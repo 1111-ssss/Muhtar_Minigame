@@ -151,7 +151,13 @@ class _BattleOverlayState extends State<BattleOverlay> {
         !identical(source[data.index], data.die)) {
       return false;
     }
-    return data.fromBoard ? data.index != cell : _battle.board[cell] == null;
+    if (data.fromBoard) {
+      return data.index != cell &&
+          data.die.dice.modifier != DiceModifier.heavy &&
+          (_battle.board[cell] == null ||
+              _battle.board[cell]!.dice.modifier != DiceModifier.heavy);
+    }
+    return _battle.board[cell] == null && _battle.canPlaceDie(data.index);
   }
 
   void _place(_DieDrag data, int cell) {
@@ -284,6 +290,19 @@ class _BattleOverlayState extends State<BattleOverlay> {
                                 fontSize: 20,
                                 color: Color(0xFFE4CAA0),
                                 letterSpacing: 2,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            right: 20,
+                            top: 54,
+                            child: Text(
+                              'ЭНЕРГИЯ ${_battle.energy}/${BattleEngine.maxEnergy}',
+                              key: const ValueKey('battle-energy'),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF78F3D0),
+                                letterSpacing: 1.2,
                               ),
                             ),
                           ),
@@ -538,7 +557,9 @@ class _BattleOverlayState extends State<BattleOverlay> {
                 ),
               ),
             ),
-          if (_selectedCell != null)
+          if (_selectedCell != null &&
+              _battle.board[_selectedCell!]?.dice.modifier !=
+                  DiceModifier.heavy)
             Positioned(
               left: 112,
               right: 112,
@@ -634,7 +655,10 @@ class _BattleOverlayState extends State<BattleOverlay> {
   Widget _draggable(Widget child, _DieDrag data, double scale) =>
       Draggable<_DieDrag>(
         data: data,
-        maxSimultaneousDrags: _battle.canAct ? 1 : 0,
+        maxSimultaneousDrags:
+            _battle.canAct && data.die.dice.modifier != DiceModifier.heavy
+            ? 1
+            : 0,
         // Центр кости остаётся под указателем, а не та точка, за которую
         // пользователь случайно схватил его.
         dragAnchorStrategy: childDragAnchorStrategy,
@@ -1000,7 +1024,9 @@ class _DieFace extends StatelessWidget {
     final hasUpgrade = value != die.value;
     return Tooltip(
       message:
-          '${die.dice.name} · уровень ${die.dice.level}\n${die.dice.ability.description}',
+          '${die.dice.name} · уровень ${die.dice.level}\n'
+          '${die.dice.ability.description}\n'
+          '${die.dice.modifier.description}',
       child: SizedBox(
         width: compact ? 72 : 90,
         height: compact ? 82 : 90,

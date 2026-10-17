@@ -36,15 +36,19 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
   Future<void> _open(CaseType type) async {
     if (_opening) return;
     final state = widget.game.gameState;
-    final dice = type == CaseType.dice ? state.openDiceCase() : null;
+    final dice = type == CaseType.dice ? state.openDiceBox() : null;
     final choices = type == CaseType.artifact
-        ? state.openArtifactCase()
+        ? state.openArtifactBox()
         : <Artifact>[];
-    if (dice == null && choices.isEmpty) return;
+    if (dice == null &&
+        choices.isEmpty &&
+        !state.hasPendingModifierChoice) {
+      return;
+    }
     setState(() => _opening = true);
     widget.game.modalDialogOpen = true;
     try {
-      // Сначала фиксируем результат. Перезапуск не даёт новый бросок кейса.
+      // Сначала фиксируем результат. Перезапуск не даёт новый бросок ящика.
       await widget.game.saveProgress();
       if (!mounted) return;
       if (dice != null) {
@@ -54,18 +58,51 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
           builder: (_) => DiceCaseDialog(result: dice),
         );
       } else {
-        final chosen = await showDialog<Artifact>(
+        if (state.pendingModifier != null) {
+          await _applyPendingModifier(state, showRoll: false);
+          return;
+        }
+        final chosen = await showDialog<Object>(
           context: context,
           barrierDismissible: false,
-          builder: (_) => ArtifactCaseDialog(choices: choices),
+          builder: (_) => ArtifactCaseDialog(
+            choices: choices,
+            showModifier: state.hasPendingModifierChoice,
+          ),
         );
-        if (chosen != null && state.chooseArtifact(chosen)) {
+        if (chosen is Artifact && state.chooseArtifact(chosen)) {
           await widget.game.saveProgress();
+        } else if (chosen == ArtifactBoxChoice.modifier) {
+          await _applyPendingModifier(state);
         }
       }
     } finally {
       widget.game.modalDialogOpen = false;
       if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  Future<void> _applyPendingModifier(
+    GameState state, {
+    bool showRoll = true,
+  }) async {
+    final modifier = state.rollModifier();
+    if (modifier == null) return;
+    if (showRoll) {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ModifierRollDialog(result: modifier),
+      );
+    }
+    if (!mounted) return;
+    final target = await showDialog<int>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => DiceModifierTargetDialog(dice: state.inventory),
+    );
+    if (target != null && state.applyPendingModifier(target)) {
+      await widget.game.saveProgress();
     }
   }
 
@@ -568,12 +605,12 @@ class _ShopGrid extends StatelessWidget {
         physics: const NeverScrollableScrollPhysics(),
         children: [
           _Purchase(
-            title: 'Кейс кости',
-            description: 'Случайная способность и уровень.',
+            title: 'Ящик костей',
+            description: 'Случайный тип и уровень 1–3.',
             icon: Icons.inventory_2_outlined,
             price: GameState.caseCost,
             onBuy: state.coins >= GameState.caseCost
-                ? () => onUpgrade(state.buyCase)
+                ? () => onUpgrade(state.buyDiceBox)
                 : null,
           ),
           _Purchase(
@@ -680,7 +717,7 @@ class _InventoryPanel extends StatelessWidget {
           Text(
             mergeMode
                 ? 'Выберите две одинаковые кости. Совместимые варианты подсвечены.'
-                : 'Кейсы отображаются первыми, затем предметы и кости — '
+                : 'Ящики отображаются первыми, затем предметы и кости — '
                       'от высокого уровня к низкому.',
             style: const TextStyle(color: Colors.white70, height: 1.35),
           ),
@@ -705,7 +742,7 @@ class _InventoryPanel extends StatelessWidget {
                 if (!mergeMode && item < CaseType.values.length) {
                   return _CaseTile(
                     type: CaseType.values[item],
-                    count: state.caseCount(CaseType.values[item]),
+                    count: state.boxCount(CaseType.values[item]),
                     pending:
                         CaseType.values[item] == CaseType.artifact &&
                         state.pendingArtifactChoices.isNotEmpty,
@@ -931,7 +968,7 @@ class _DiceInventoryTile extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     button: mergeMode,
     selected: selected,
-    label: '${dice.name}, уровень ${dice.level}',
+    label: '${dice.name}, уровень ${dice.level}, ${dice.modifier.title}',
     child: Material(
       color: Colors.transparent,
       child: InkWell(
@@ -985,7 +1022,7 @@ class _DiceInventoryTile extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               Text(
-                'Уровень ${dice.level}',
+                'Уровень ${dice.level} · ${dice.modifier.title}',
                 style: TextStyle(
                   color: selected
                       ? const Color(0xFF78F3D0)
@@ -1096,13 +1133,13 @@ class _ArtifactPanel extends StatelessWidget {
         const _PanelTitle('Артефакты', Icons.auto_awesome),
         const SizedBox(height: 6),
         const Text(
-          'Пассивные эффекты героя и их количество.',
+          'Пассивные эффекты героя, редкость и количество.',
           style: TextStyle(color: Colors.white70),
         ),
         const SizedBox(height: 14),
         if (state.artifacts.isEmpty)
           const Text(
-            'Кейсы артефактов выдаются за задания.',
+            'Ящики артефактов выдаются за задания.',
             style: TextStyle(color: Colors.white54),
           )
         else
@@ -1125,7 +1162,8 @@ class _ArtifactPanel extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${entry.key.title} ×${entry.value}',
+                          '${entry.key.title} · ${entry.key.rarity.title} '
+                          '×${entry.value}',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),

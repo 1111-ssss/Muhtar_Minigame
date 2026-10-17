@@ -174,7 +174,7 @@ class GameContent {
     visualKey: 'upgrade',
   );
 
-  /// Архетипы, которые могут выпасть из кейса костей.
+  /// Архетипы, которые могут выпасть из ящика костей.
   static const List<Dice> diceCatalog = [
     starterDice,
     doctorDice,

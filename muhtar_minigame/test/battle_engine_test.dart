@@ -72,6 +72,133 @@ void main() {
     expect(battle.hotbarSize, 3);
   });
 
+  test('энергия ограничивает размещение двумя костями и сбрасывается до двух', () {
+    final battle = BattleEngine(
+      player: player(
+        dice: const [
+          Dice(id: 'a', name: 'Атака 1', baseFaces: [1]),
+          Dice(id: 'b', name: 'Атака 2', baseFaces: [1]),
+          Dice(id: 'c', name: 'Атака 3', baseFaces: [1]),
+        ],
+      ),
+      enemy: Fighter(name: 'Враг', maxHp: 30, attackFaces: const [0]),
+      playerDiceCount: 3,
+    )..startTurn();
+
+    expect(battle.energy, BattleEngine.maxEnergy);
+    expect(battle.placeDie(0, 0), isTrue);
+    expect(battle.energy, 1);
+    expect(battle.placeDie(1, 1), isTrue);
+    expect(battle.energy, 0);
+    expect(battle.placeDie(2, 2), isFalse);
+
+    battle.endTurn();
+    expect(battle.energy, BattleEngine.maxEnergy);
+  });
+
+  test('Легкий не тратит энергию, Тяжелый нельзя снять и он теряет уровни', () {
+    final lightBattle = BattleEngine(
+      player: player(
+        dice: const [
+          Dice(id: 'a', name: 'Атака 1', baseFaces: [1]),
+          Dice(
+            id: 'light',
+            name: 'Легкая атака',
+            baseFaces: [1],
+            modifier: DiceModifier.light,
+          ),
+          Dice(id: 'c', name: 'Атака 3', baseFaces: [1]),
+        ],
+      ),
+      enemy: Fighter(name: 'Враг', maxHp: 30, attackFaces: const [0]),
+      playerDiceCount: 3,
+      random: const _MaxRandom(),
+    )..startTurn();
+    expect(lightBattle.placeDie(0, 0), isTrue);
+    expect(lightBattle.placeDie(1, 1), isTrue);
+    expect(lightBattle.energy, 1);
+    expect(lightBattle.placeDie(2, 2), isTrue);
+    expect(lightBattle.energy, 0);
+
+    final heavy = Dice(
+      id: 'heavy',
+      name: 'Тяжелая атака',
+      baseFaces: [2],
+      level: 2,
+      modifier: DiceModifier.heavy,
+    );
+    final heavyBattle = BattleEngine(
+      player: player(dice: [heavy]),
+      enemy: Fighter(name: 'Враг', maxHp: 30, attackFaces: const [0]),
+    )..startTurn();
+    expect(heavyBattle.placeDie(0, 4), isTrue);
+    expect(heavyBattle.removeDie(4), isFalse);
+    expect(heavyBattle.moveDie(4, 1), isFalse);
+    heavyBattle.endTurn();
+    expect(heavyBattle.board[4]!.dice.level, 1);
+    expect(heavyBattle.player.dice.single.level, 1);
+    heavyBattle.endTurn();
+    expect(heavyBattle.board[4], isNull);
+    expect(heavyBattle.player.dice, isEmpty);
+  });
+
+  test('Стекло применяет эффект с учетом клетки и больше не выпадает', () {
+    const glassUpgrade = Dice(
+      id: 'glass-upgrade',
+      name: 'Стеклянное улучшение',
+      baseFaces: [2],
+      ability: DiceAbility.upgrade,
+      modifier: DiceModifier.glass,
+    );
+    const attack = Dice(
+      id: 'attack',
+      name: 'Атака',
+      baseFaces: [3],
+      ability: DiceAbility.warrior,
+    );
+    final battle = BattleEngine(
+      player: player(dice: const [glassUpgrade, attack]),
+      enemy: Fighter(name: 'Враг', maxHp: 30, attackFaces: const [0]),
+      playerDiceCount: 2,
+      random: const _MaxRandom(),
+    )..startTurn();
+
+    expect(battle.placeDie(0, 1), isTrue);
+    expect(battle.placeDie(1, 4), isTrue);
+    expect(battle.board[4], isNull);
+    expect(battle.player.dice, hasLength(1));
+    expect(battle.playerIntent.attack, 5);
+  });
+
+  test('кость лечения выпадает только один раз за бой', () {
+    final battle = BattleEngine(
+      player: player(
+        dice: const [
+          Dice(
+            id: 'doctor',
+            name: 'Доктор',
+            baseFaces: [1],
+            ability: DiceAbility.doctor,
+          ),
+          Dice(id: 'warrior', name: 'Атака', baseFaces: [1]),
+        ],
+      ),
+      enemy: Fighter(name: 'Враг', maxHp: 30, attackFaces: const [0]),
+      playerDiceCount: 2,
+      random: const _MaxRandom(),
+    )..startTurn();
+
+    expect(battle.healingDieDrawn, isTrue);
+    battle.placeDie(0, 0);
+    battle.placeDie(1, 1);
+    battle.endTurn();
+
+    expect(
+      battle.hotbar.where((die) => die?.dice.ability == DiceAbility.doctor),
+      isEmpty,
+    );
+  });
+
   test('враг получает реплику текущего раунда до атаки', () {
     final battle = BattleEngine(
       player: player(),
@@ -249,6 +376,7 @@ void main() {
         name: 'Улучшение',
         baseFaces: [1, 2, 3, 4, 5, 6],
         ability: DiceAbility.upgrade,
+        modifier: DiceModifier.light,
       );
       const attack = Dice(
         id: 'attack',

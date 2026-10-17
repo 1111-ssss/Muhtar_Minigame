@@ -710,6 +710,12 @@ class MuhtarGame extends FlameGame
       playerDiceCount: gameState.dicePerTurn,
       playerRerollsPerRound: gameState.rerollsPerRound,
       artifacts: gameState.artifacts,
+      onDiceConsumed: (dice) {
+        if (gameState.consumeDice(dice)) unawaited(saveProgress());
+      },
+      onDiceChanged: (before, after) {
+        if (gameState.replaceDice(before, after)) unawaited(saveProgress());
+      },
     );
     world_.player.stop();
     overlays.remove(overlayDialog);

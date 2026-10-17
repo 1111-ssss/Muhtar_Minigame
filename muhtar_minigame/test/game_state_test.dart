@@ -101,7 +101,7 @@ void main() {
     });
 
     test(
-      'кейс добавляет случайный кубик в инвентарь, а дубликаты объединяются',
+      'ящик добавляет случайный кубик в инвентарь, а дубликаты объединяются',
       () {
         final state = GameState()..addCoins(1000);
         final before = state.inventoryCount;
@@ -139,6 +139,57 @@ void main() {
         );
       },
     );
+
+    test('ящик костей выдаёт любой тип, но только уровни 1–3', () {
+      for (final sample in [
+        (random: 0, level: 1),
+        (random: 70, level: 2),
+        (random: 99, level: 3),
+      ]) {
+        final state = GameState(random: _FixedRandom(sample.random));
+        state.addCoins(100);
+        expect(state.buyDiceBox(), isTrue);
+        final result = state.openDiceBox();
+        expect(result, isNotNull);
+        final dice = result!;
+        expect(dice.level, sample.level);
+        expect(dice.level, lessThanOrEqualTo(GameState.maxDiceBoxLevel));
+      }
+    });
+
+    test('ящик артефактов показывает модификатор первым и не стакует уникальные', () {
+      final state = GameState(random: const _FixedRandom(0));
+      state.addArtifactBoxes(1);
+      final choices = state.openArtifactBox();
+
+      expect(state.hasPendingModifierChoice, isTrue);
+      expect(choices, hasLength(3));
+      expect(choices.toSet(), hasLength(3));
+      expect(state.chooseArtifact(choices.first), isTrue);
+      expect(state.artifacts[choices.first], 1);
+      expect(state.hasPendingModifierChoice, isFalse);
+
+      state.addArtifactBoxes(1);
+      state.openArtifactBox();
+      final modifier = state.rollModifier();
+      expect(modifier, isNot(DiceModifier.none));
+      expect(state.applyPendingModifier(0), isTrue);
+      expect(state.dice.first.modifier, modifier);
+    });
+
+    test('редкость и нестакуемость артефактов мигрируют из старого сейва', () {
+      final state = GameState()
+        ..fromJson({
+          'cases': {'artifact': 2},
+          'artifacts': {'truceSeal': 3, 'ironThread': 3},
+        });
+
+      expect(state.boxCount(CaseType.artifact), 2);
+      expect(state.artifacts[Artifact.truceSeal], 1);
+      expect(state.artifacts[Artifact.ironThread], 3);
+      expect(Artifact.truceSeal.stackable, isFalse);
+      expect(Artifact.ironThread.rarity, ArtifactRarity.common);
+    });
 
     test(
       'два одинаковых экземпляра одного типа можно объединить по индексам',
@@ -468,7 +519,11 @@ void main() {
       for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
         hpState.searchProp(emptyProp.id);
       }
-      expect(hpState.searchResult(emptyProp.id)!.amount, 1);
+      expect(
+        hpState.searchResult(emptyProp.id)!.amount,
+        inInclusiveRange(1, GameState.maxBushHpReward),
+      );
+      expect(hpState.searchResult(emptyProp.id)!.amount, 2);
       expect(hpState.playerHp, 30);
 
       final coinState = GameState(random: const _FixedRandom(2));

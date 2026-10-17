@@ -620,8 +620,8 @@ class _RewardPanel extends StatelessWidget {
       SearchRewardType.hp => 'здоровье',
       SearchRewardType.coins => 'монеты',
       SearchRewardType.xp => 'опыт',
-      SearchRewardType.artifactCase => 'кейс артефакта',
-      SearchRewardType.diceCase => 'кейс кости',
+      SearchRewardType.artifactCase => 'ящик артефактов',
+      SearchRewardType.diceCase => 'ящик костей',
       SearchRewardType.item => 'предмет',
       SearchRewardType.none => 'ничего',
     };

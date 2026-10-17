@@ -3,6 +3,27 @@ import 'package:flutter/foundation.dart';
 /// Особый эффект боевой кости.
 enum DiceAbility { none, warrior, doctor, ember, guardian, upgrade }
 
+/// Одноразовый модификатор, который можно наложить на кость из инвентаря.
+enum DiceModifier { none, light, heavy, glass }
+
+extension DiceModifierInfo on DiceModifier {
+  String get title => switch (this) {
+    DiceModifier.none => 'Без модификатора',
+    DiceModifier.light => 'Легкий',
+    DiceModifier.heavy => 'Тяжелый',
+    DiceModifier.glass => 'Стекло',
+  };
+
+  String get description => switch (this) {
+    DiceModifier.none => 'Обычная кость.',
+    DiceModifier.light => 'Не тратит энергию при размещении.',
+    DiceModifier.heavy =>
+      'После хода остается на доске и теряет уровень. Нельзя перемещать или снять.',
+    DiceModifier.glass =>
+      'Срабатывает при размещении с учетом клетки и разбивается.',
+  };
+}
+
 extension DiceAbilityInfo on DiceAbility {
   String get description => switch (this) {
     DiceAbility.none => 'Атакующая кость.',
@@ -25,6 +46,7 @@ class Dice {
     required this.baseFaces,
     this.level = 1,
     this.ability = DiceAbility.none,
+    this.modifier = DiceModifier.none,
     this.visualKey = 'blade',
   });
 
@@ -39,6 +61,9 @@ class Dice {
 
   /// Эффект, который срабатывает, когда эта кость использована в слоте.
   final DiceAbility ability;
+
+  /// Модификатор, полученный из ящика артефактов.
+  final DiceModifier modifier;
 
   /// Ключ визуального оформления в Flutter-оверлеях.
   final String visualKey;
@@ -61,20 +86,29 @@ class Dice {
 
   bool get canUpgrade => level < maxLevel;
 
-  Dice copyWith({int? level, DiceAbility? ability, String? visualKey}) => Dice(
+  Dice copyWith({
+    int? level,
+    DiceAbility? ability,
+    DiceModifier? modifier,
+    String? visualKey,
+  }) => Dice(
     id: id,
     name: name,
     baseFaces: baseFaces,
     level: level ?? this.level,
     ability: ability ?? this.ability,
+    modifier: modifier ?? this.modifier,
     visualKey: visualKey ?? this.visualKey,
   );
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Dice && other.id == id && other.level == level;
+      other is Dice &&
+          other.id == id &&
+          other.level == level &&
+          other.modifier == modifier;
 
   @override
-  int get hashCode => Object.hash(id, level);
+  int get hashCode => Object.hash(id, level, modifier);
 }
