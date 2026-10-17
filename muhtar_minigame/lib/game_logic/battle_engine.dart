@@ -219,12 +219,12 @@ class BattleEngine extends ChangeNotifier {
   RolledDie? _drawDie({Iterable<RolledDie?> excluded = const []}) {
     final excludedIds = {
       for (final die in excluded)
-        if (die != null && die.dice.modifier != DiceModifier.none) die.dice.id,
+        if (die != null && die.dice.activeModifiers.isNotEmpty) die.dice.id,
     };
     final candidates = _availableDice
         .where(
           (die) =>
-              die.modifier == DiceModifier.none ||
+              die.activeModifiers.isEmpty ||
               !excludedIds.contains(die.id),
         )
         .toList();
@@ -248,7 +248,7 @@ class BattleEngine extends ChangeNotifier {
     _chooseRootedCells();
     final drawnSources = <String>{
       for (final die in _hotbar)
-        if (die != null && die.dice.modifier != DiceModifier.none)
+        if (die != null && die.dice.activeModifiers.isNotEmpty)
           die.dice.id,
     };
     for (var index = 0; index < hotbarSize; index++) {
@@ -259,7 +259,7 @@ class BattleEngine extends ChangeNotifier {
         final fallbackCandidates = _availableDice
             .where(
               (dice) =>
-                  dice.modifier == DiceModifier.none ||
+                  dice.activeModifiers.isEmpty ||
                   !drawnSources.contains(dice.id),
             )
             .toList();
@@ -321,7 +321,7 @@ class BattleEngine extends ChangeNotifier {
   }
 
   static int _energyCost(RolledDie die) =>
-      die.dice.modifier == DiceModifier.light ? 0 : 1;
+      die.dice.hasModifier(DiceModifier.light) ? 0 : 1;
 
   /// Установка сразу расходует бросок: слот хотбара остаётся пустым до
   /// следующего раунда. Легкий не расходует энергию, Стекло срабатывает сразу.
@@ -339,7 +339,7 @@ class BattleEngine extends ChangeNotifier {
     final die = _hotbar[hotbarIndex]!;
     energy -= _energyCost(die);
     _hotbar[hotbarIndex] = null;
-    if (die.dice.modifier == DiceModifier.glass) {
+    if (die.dice.hasModifier(DiceModifier.glass)) {
       _glassDice.add(MapEntry(cell, die));
       final inventoryIndex = player.dice.indexOf(die.dice);
       if (inventoryIndex >= 0) player.dice.removeAt(inventoryIndex);
@@ -486,7 +486,7 @@ class BattleEngine extends ChangeNotifier {
   static bool _validCell(int cell) => cell >= 0 && cell < 9;
 
   static bool _isLocked(RolledDie die) =>
-      die.dice.modifier == DiceModifier.heavy;
+      die.dice.hasModifier(DiceModifier.heavy);
 
   /// Фиксированный приоритет клеток: сначала соседи, затем дальние клетки.
   /// Пустые позиции не заменяются другими целями. Число целей по уровням:

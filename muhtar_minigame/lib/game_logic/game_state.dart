@@ -376,18 +376,32 @@ class GameState extends ChangeNotifier {
 
   List<int> get modifierTargetIndexes => [
     for (var index = 0; index < _dice.length; index++)
-      if (_dice[index].modifier == DiceModifier.none) index,
+      if (_pendingModifier != null &&
+          _canApplyModifier(_dice[index], _pendingModifier!))
+        index,
   ];
+
+  static bool _canApplyModifier(Dice dice, DiceModifier modifier) {
+    if (modifier == DiceModifier.none || dice.hasModifier(modifier)) {
+      return false;
+    }
+    return !dice.activeModifiers.any((current) => current.conflictsWith(modifier));
+  }
 
   bool applyPendingModifier(int diceIndex) {
     final modifier = _pendingModifier;
     if (modifier == null ||
         diceIndex < 0 ||
         diceIndex >= _dice.length ||
-        _dice[diceIndex].modifier != DiceModifier.none) {
+        !_canApplyModifier(_dice[diceIndex], modifier)) {
       return false;
     }
-    _dice[diceIndex] = _dice[diceIndex].copyWith(modifier: modifier);
+    _dice[diceIndex] = _dice[diceIndex].copyWith(
+      modifier: _dice[diceIndex].activeModifiers.isEmpty
+          ? modifier
+          : _dice[diceIndex].modifier,
+      modifiers: {..._dice[diceIndex].activeModifiers, modifier},
+    );
     _pendingModifier = null;
     _pendingModifierChoice = false;
     _pendingArtifactChoices = [];
@@ -511,7 +525,8 @@ class GameState extends ChangeNotifier {
     final second = _dice[secondIndex];
     if (first.ability != second.ability ||
         first.level != second.level ||
-        first.modifier != second.modifier) {
+        first.activeModifiers.length != second.activeModifiers.length ||
+        !first.activeModifiers.containsAll(second.activeModifiers)) {
       return false;
     }
     if (first.level >= Dice.maxLevel) return false;
@@ -886,6 +901,9 @@ class GameState extends ChangeNotifier {
             'level': d.level,
             'ability': d.ability.name,
             'modifier': d.modifier.name,
+            'modifiers': d.activeModifiers
+                .map((modifier) => modifier.name)
+                .toList(),
             'visualKey': d.visualKey,
           },
         )
@@ -1060,6 +1078,18 @@ class GameState extends ChangeNotifier {
         final modifier = DiceModifier.values.where(
           (candidate) => candidate.name == modifierName,
         );
+        final savedModifiers = <DiceModifier>{};
+        final rawModifiers = d['modifiers'];
+        if (rawModifiers is List) {
+          for (final value in rawModifiers) {
+            final saved = DiceModifier.values.where(
+              (candidate) => candidate.name == value.toString(),
+            );
+            if (saved.isNotEmpty && saved.first != DiceModifier.none) {
+              savedModifiers.add(saved.first);
+            }
+          }
+        }
         return Dice(
           id: id,
           name: d['name'] as String? ?? template?.name ?? id,
@@ -1069,6 +1099,7 @@ class GameState extends ChangeNotifier {
               ? template?.ability ?? DiceAbility.none
               : ability.first,
           modifier: modifier.isEmpty ? DiceModifier.none : modifier.first,
+          modifiers: savedModifiers ?? const {},
           visualKey:
               d['visualKey'] as String? ?? template?.visualKey ?? 'blade',
         );

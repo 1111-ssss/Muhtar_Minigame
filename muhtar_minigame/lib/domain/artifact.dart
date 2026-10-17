@@ -1,23 +1,24 @@
 /// Редкость награды определяет вес выпадения из ящика артефактов.
-enum ArtifactRarity { common, rare, epic }
+enum ArtifactRarity { common, rare, epic, veryRare }
 
 extension ArtifactRarityInfo on ArtifactRarity {
   String get title => switch (this) {
     ArtifactRarity.common => 'Обычный',
     ArtifactRarity.rare => 'Редкий',
     ArtifactRarity.epic => 'Эпический',
+    ArtifactRarity.veryRare => 'Очень редкий',
   };
 
   /// Вес выбора без замены. Чем он меньше, тем реже артефакт предлагается.
   int get dropWeight => switch (this) {
     ArtifactRarity.common => 6,
     ArtifactRarity.rare => 3,
-    ArtifactRarity.epic => 1,
+    ArtifactRarity.epic => 2,
+    ArtifactRarity.veryRare => 1,
   };
 }
 
-/// Постоянные пассивные эффекты. Большинство артефактов уникальны и не
-/// складываются; Железная нить и Точильный камень остаются стакаемыми.
+/// Постоянные пассивные эффекты. Артефакты уникальны и не складываются.
 enum Artifact {
   truceSeal,
   ironThread,
@@ -40,8 +41,8 @@ enum Artifact {
       'В первом раунде защищает от урона и поджога, если ваша '
           'атака не пробивает щит врага и на враге ещё нет горения. '
           'Артефакт уникален и не складывается.',
-    ironThread => '+2 щита каждый раунд. Этот артефакт складывается.',
-    whetstone => '+1 урона каждой атакующей кости. Этот артефакт складывается.',
+    ironThread => '+2 щита каждый раунд. Артефакт уникален.',
+    whetstone => '+1 урона каждой атакующей кости. Артефакт уникален.',
     fieldKit => 'Лечит 2 HP в конце раунда. Артефакт уникален.',
     emberHeart => '+1 горения каждой огненной кости. Артефакт уникален.',
     luckyCharm => '+1 реролл за раунд, суммарно не более 6. Артефакт уникален.',
@@ -49,14 +50,14 @@ enum Artifact {
 
   ArtifactRarity get rarity => switch (this) {
     Artifact.truceSeal => ArtifactRarity.rare,
-    Artifact.ironThread => ArtifactRarity.common,
-    Artifact.whetstone => ArtifactRarity.common,
-    Artifact.fieldKit => ArtifactRarity.rare,
+    Artifact.ironThread => ArtifactRarity.rare,
+    Artifact.whetstone => ArtifactRarity.rare,
+    Artifact.fieldKit => ArtifactRarity.veryRare,
     Artifact.emberHeart => ArtifactRarity.epic,
     Artifact.luckyCharm => ArtifactRarity.rare,
   };
 
-  bool get stackable => this == Artifact.ironThread || this == Artifact.whetstone;
+  bool get stackable => false;
 }
 
 enum CaseType { dice, artifact }

@@ -3,6 +3,24 @@ import 'package:flutter/foundation.dart';
 /// Особый эффект боевой кости.
 enum DiceAbility { none, warrior, doctor, ember, guardian, upgrade }
 
+enum DiceRarity { common, rare, epic, legendary }
+
+extension DiceRarityInfo on DiceRarity {
+  String get title => switch (this) {
+    DiceRarity.common => 'Обычная',
+    DiceRarity.rare => 'Редкая',
+    DiceRarity.epic => 'Эпическая',
+    DiceRarity.legendary => 'Легендарная',
+  };
+}
+
+DiceRarity diceRarityForLevel(int level) => switch (level) {
+  <= 1 => DiceRarity.common,
+  2 => DiceRarity.rare,
+  3 => DiceRarity.epic,
+  _ => DiceRarity.legendary,
+};
+
 /// Одноразовый модификатор, который можно наложить на кость из инвентаря.
 enum DiceModifier { none, light, heavy, glass }
 
@@ -22,6 +40,10 @@ extension DiceModifierInfo on DiceModifier {
     DiceModifier.glass =>
       'Срабатывает при размещении с учетом клетки и разбивается.',
   };
+
+  bool conflictsWith(DiceModifier other) =>
+      (this == DiceModifier.heavy && other == DiceModifier.glass) ||
+      (this == DiceModifier.glass && other == DiceModifier.heavy);
 }
 
 extension DiceAbilityInfo on DiceAbility {
@@ -47,6 +69,7 @@ class Dice {
     this.level = 1,
     this.ability = DiceAbility.none,
     this.modifier = DiceModifier.none,
+    this.modifiers = const {},
     this.visualKey = 'blade',
   });
 
@@ -64,6 +87,19 @@ class Dice {
 
   /// Модификатор, полученный из ящика артефактов.
   final DiceModifier modifier;
+
+  /// Дополнительные модификаторы. Поле [modifier] оставлено для совместимости
+  /// со старыми сохранениями и конструкторами.
+  final Set<DiceModifier> modifiers;
+
+  Set<DiceModifier> get activeModifiers => Set.unmodifiable({
+    ...modifiers,
+    if (modifier != DiceModifier.none) modifier,
+  }..remove(DiceModifier.none));
+
+  bool hasModifier(DiceModifier value) => activeModifiers.contains(value);
+
+  DiceRarity get rarity => diceRarityForLevel(level);
 
   /// Ключ визуального оформления в Flutter-оверлеях.
   final String visualKey;
@@ -90,6 +126,7 @@ class Dice {
     int? level,
     DiceAbility? ability,
     DiceModifier? modifier,
+    Set<DiceModifier>? modifiers,
     String? visualKey,
   }) => Dice(
     id: id,
@@ -98,6 +135,7 @@ class Dice {
     level: level ?? this.level,
     ability: ability ?? this.ability,
     modifier: modifier ?? this.modifier,
+    modifiers: modifiers ?? this.modifiers,
     visualKey: visualKey ?? this.visualKey,
   );
 
@@ -107,8 +145,13 @@ class Dice {
       other is Dice &&
           other.id == id &&
           other.level == level &&
-          other.modifier == modifier;
+          other.activeModifiers.length == activeModifiers.length &&
+          other.activeModifiers.containsAll(activeModifiers);
 
   @override
-  int get hashCode => Object.hash(id, level, modifier);
+  int get hashCode => Object.hash(
+    id,
+    level,
+    activeModifiers.fold<int>(0, (hash, modifier) => hash ^ modifier.index),
+  );
 }

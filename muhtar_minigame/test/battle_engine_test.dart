@@ -72,6 +72,17 @@ void main() {
     expect(battle.hotbarSize, 3);
   });
 
+  test('начало боя безопасно заполняет хотбар при пустых слотах', () {
+    final battle = BattleEngine(
+      player: player(),
+      enemy: enemy(),
+      playerDiceCount: 3,
+    )..startTurn();
+
+    expect(battle.hotbar, hasLength(3));
+    expect(battle.hotbar.whereType<RolledDie>(), hasLength(3));
+  });
+
   test('энергия ограничивает размещение двумя костями и сбрасывается до двух', () {
     final battle = BattleEngine(
       player: player(
@@ -591,13 +602,13 @@ void main() {
     );
   });
 
-  test('каждая копия железной нити добавляет два щита', () {
+  test('железная нить не складывается даже при старом количестве копий', () {
     final battle = BattleEngine(
       player: player(),
       enemy: enemy(),
       artifacts: const {Artifact.ironThread: 2},
     )..startTurn();
 
-    expect(battle.playerIntent.shield, 4);
+    expect(battle.playerIntent.shield, 2);
   });
 }

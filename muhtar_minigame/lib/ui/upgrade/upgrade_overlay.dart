@@ -4,6 +4,7 @@ import '../../domain/artifact.dart';
 import '../../domain/dice.dart';
 import '../../domain/game_content.dart';
 import '../../domain/quest.dart';
+import '../../domain/player_skin.dart';
 import '../../domain/shop_item.dart';
 import '../../game/muhtar_game.dart';
 import '../../game_logic/game_state.dart';
@@ -100,7 +101,10 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
     final target = await showDialog<int>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => DiceModifierTargetDialog(dice: state.inventory),
+      builder: (_) => DiceModifierTargetDialog(
+        dice: state.inventory,
+        modifier: modifier,
+      ),
     );
     if (target != null && state.applyPendingModifier(target)) {
       await widget.game.saveProgress();
@@ -135,7 +139,8 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
               entry.key != index &&
               entry.value.ability == candidate.ability &&
               entry.value.level == candidate.level &&
-              entry.value.modifier == candidate.modifier,
+              entry.value.activeModifiers.length == candidate.activeModifiers.length &&
+              entry.value.activeModifiers.containsAll(candidate.activeModifiers),
         );
   }
 
@@ -150,7 +155,8 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
           (index) =>
               dice[index].ability != selected.ability ||
               dice[index].level != selected.level ||
-              dice[index].modifier != selected.modifier,
+              dice[index].activeModifiers.length != selected.activeModifiers.length ||
+              !dice[index].activeModifiers.containsAll(selected.activeModifiers),
         );
       }
     }
@@ -173,7 +179,8 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
       final second = state.inventory[index];
       if (first.ability != second.ability ||
           first.level != second.level ||
-          first.modifier != second.modifier) {
+          first.activeModifiers.length != second.activeModifiers.length ||
+          !first.activeModifiers.containsAll(second.activeModifiers)) {
         return;
       }
     }
@@ -253,11 +260,6 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
                       ),
                       const SizedBox(height: 8),
                     ],
-                    _SkinSelectionPanel(
-                      state: state,
-                      onSelect: (skinId) => _selectSkin(state, skinId),
-                    ),
-                    const SizedBox(height: 8),
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final wide = constraints.maxWidth >= 760;
@@ -299,6 +301,11 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
                         );
                       },
                     ),
+                    const SizedBox(height: 16),
+                    _SkinSelectionPanel(
+                      state: state,
+                      onSelect: (skinId) => _selectSkin(state, skinId),
+                    ),
                   ],
                 ),
               ),
@@ -322,42 +329,6 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
   }
 }
 
-/// Временной адаптер для API скинов. Он намеренно живёт в UI: пока GameState
-/// ещё не содержит эти поля, старые сохранения и старые тестовые состояния
-/// продолжают открывать инвентарь, а будущий API подключается без миграции
-/// конструкторов оверлея.
-dynamic _tryRead(dynamic Function() read) {
-  try {
-    return read();
-  } catch (_) {
-    return null;
-  }
-}
-
-List<String> _skinIds(dynamic value) {
-  if (value is! Iterable) return const [];
-  return value
-      .map((item) => _skinValue(item, 'id') ?? item.toString())
-      .where((id) => id.isNotEmpty)
-      .toSet()
-      .toList(growable: false);
-}
-
-String? _skinValue(dynamic skin, String key) {
-  if (skin is String) return key == 'id' ? skin : null;
-  if (skin is Map) return skin[key]?.toString();
-  final value = _tryRead(() {
-    final dynamic object = skin;
-    return switch (key) {
-      'id' => object.id,
-      'name' => object.name,
-      'description' => object.description,
-      _ => null,
-    };
-  });
-  return value?.toString();
-}
-
 class _SkinSelectionPanel extends StatelessWidget {
   const _SkinSelectionPanel({required this.state, required this.onSelect});
 
@@ -366,49 +337,34 @@ class _SkinSelectionPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dynamic dynamicState = state;
-    final availableValue = _tryRead(() => dynamicState.availableSkins);
-    final available = availableValue is Iterable
-        ? availableValue.toList(growable: false)
-        : GameContent.skinCatalog;
-    final owned = _skinIds(_tryRead(() => dynamicState.ownedSkinIds));
-    final selected = _tryRead(() => dynamicState.selectedSkinId)?.toString();
+    final owned = state.ownedSkinIds;
+    final selected = state.selectedSkinId;
 
     return _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _PanelTitle('Образ героя', Icons.palette_outlined),
+          const _PanelTitle('Скины героя', Icons.palette_outlined),
           const SizedBox(height: 6),
           const Text(
-            'Выберите открытый скин для героя на карте.',
+            'Второй раздел инвентаря: выберите открытый образ. Картинка героя '
+            'видна сразу.',
             style: TextStyle(color: Colors.white70),
           ),
           const SizedBox(height: 14),
-          if (available.isEmpty)
-            const Text(
-              'Скины появятся после подключения каталога образов.',
-              style: TextStyle(color: Colors.white54),
-            )
-          else
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (final skin in available)
-                  _SkinTile(
-                    id: _skinValue(skin, 'id') ?? skin.toString(),
-                    title: _skinValue(skin, 'name') ?? 'Скин',
-                    description: _skinValue(skin, 'description'),
-                    owned: owned.contains(
-                      _skinValue(skin, 'id') ?? skin.toString(),
-                    ),
-                    selected:
-                        selected == (_skinValue(skin, 'id') ?? skin.toString()),
-                    onSelect: onSelect,
-                  ),
-              ],
-            ),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              for (final skin in GameContent.skinCatalog)
+                _SkinTile(
+                  skin: skin,
+                  owned: owned.contains(skin.id),
+                  selected: selected == skin.id,
+                  onSelect: onSelect,
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -417,24 +373,20 @@ class _SkinSelectionPanel extends StatelessWidget {
 
 class _SkinTile extends StatelessWidget {
   const _SkinTile({
-    required this.id,
-    required this.title,
-    required this.description,
+    required this.skin,
     required this.owned,
     required this.selected,
     required this.onSelect,
   });
 
-  final String id;
-  final String title;
-  final String? description;
+  final PlayerSkin skin;
   final bool owned;
   final bool selected;
   final Future<void> Function(String skinId) onSelect;
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: 220,
+    width: 250,
     child: Card(
       color: selected ? const Color(0xFF263F48) : const Color(0xFF242737),
       child: Padding(
@@ -442,6 +394,35 @@ class _SkinTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                key: ValueKey('skin-image-${skin.id}'),
+                height: 150,
+                width: double.infinity,
+                child: Image.asset(
+                  'assets/portraits/${skin.portraitKey}.png',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => DecoratedBox(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF3B4654), Color(0xFF1B202B)],
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        owned ? Icons.person : Icons.lock_outline,
+                        size: 58,
+                        color: owned
+                            ? const Color(0xFFFFD58E)
+                            : Colors.white38,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Icon(
@@ -453,7 +434,7 @@ class _SkinTile extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    title,
+                    skin.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.bold),
@@ -461,19 +442,10 @@ class _SkinTile extends StatelessWidget {
                 ),
               ],
             ),
-            if (description != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                description!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white60, fontSize: 12),
-              ),
-            ],
             const SizedBox(height: 10),
             FilledButton(
-              key: ValueKey('skin-select-$id'),
-              onPressed: owned && !selected ? () => onSelect(id) : null,
+              key: ValueKey('skin-select-${skin.id}'),
+              onPressed: owned && !selected ? () => onSelect(skin.id) : null,
               child: Text(
                 selected
                     ? 'Выбран'
@@ -971,11 +943,18 @@ class _DiceInventoryTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    button: mergeMode,
-    selected: selected,
-    label: '${dice.name}, уровень ${dice.level}, ${dice.modifier.title}',
-    child: Material(
+  Widget build(BuildContext context) {
+    final palette = diceRarityPalette(dice.rarity);
+    final modifiers = dice.activeModifiers;
+    return DiceHoverCard(
+      dice: dice,
+      child: Semantics(
+        button: mergeMode,
+        selected: selected,
+        label:
+            '${dice.name}, ${dice.rarity.title}, уровень ${dice.level}, '
+            '${modifiers.isEmpty ? 'без модификаторов' : modifiers.map((m) => m.title).join(', ')}',
+        child: Material(
       color: Colors.transparent,
       child: InkWell(
         key: ValueKey('inventory-dice-$index'),
@@ -984,12 +963,12 @@ class _DiceInventoryTile extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF242737),
+            color: palette.background,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected
                   ? const Color(0xFF78F3D0)
-                  : const Color(0xFF4A506D),
+                  : palette.border,
               width: selected ? 3 : 1,
             ),
             boxShadow: selected
@@ -1017,31 +996,48 @@ class _DiceInventoryTile extends StatelessWidget {
                     dice: dice,
                     compact: true,
                     selected: selected,
+                    showLevel: true,
                   ),
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                dice.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(
-                'Уровень ${dice.level} · ${dice.modifier.title}',
-                style: TextStyle(
-                  color: selected
-                      ? const Color(0xFF78F3D0)
-                      : const Color(0xFFFFD58E),
-                  fontSize: 12,
+              if (modifiers.isNotEmpty)
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 4,
+                  runSpacing: 3,
+                  children: [
+                    for (final modifier in modifiers)
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: palette.foreground.withValues(alpha: .16),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
+                          child: Text(
+                            modifier.title,
+                            style: TextStyle(
+                              color: palette.foreground,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
             ],
           ),
         ),
       ),
-    ),
-  );
+        ),
+      ),
+    );
+  }
 }
 
 class _ItemInventoryTile extends StatelessWidget {
@@ -1139,7 +1135,8 @@ class _ArtifactPanel extends StatelessWidget {
         const _PanelTitle('Артефакты', Icons.auto_awesome),
         const SizedBox(height: 6),
         const Text(
-          'Пассивные эффекты героя, редкость и количество.',
+          'Наведите курсор на изображение, чтобы открыть название, редкость '
+          'и описание.',
           style: TextStyle(color: Colors.white70),
         ),
         const SizedBox(height: 14),
@@ -1149,44 +1146,18 @@ class _ArtifactPanel extends StatelessWidget {
             style: TextStyle(color: Colors.white54),
           )
         else
-          for (final entry in state.artifacts.entries)
-            Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF242737),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF56466B)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ArtifactBadge(entry.key, count: entry.value, size: 50),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${entry.key.title} · ${entry.key.rarity.title} '
-                          '×${entry.value}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          entry.key.description,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                            height: 1.3,
-                          ),
-                        ),
-                      ],
-                    ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final entry in state.artifacts.entries)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: ArtifactBadge(entry.key, count: entry.value, size: 58),
                   ),
-                ],
-              ),
+              ],
             ),
+          ),
       ],
     ),
   );

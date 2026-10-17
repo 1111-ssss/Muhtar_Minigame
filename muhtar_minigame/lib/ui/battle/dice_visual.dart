@@ -12,6 +12,7 @@ class DiceVisual extends StatelessWidget {
     this.compact = false,
     this.selected = false,
     this.used = false,
+    this.showLevel = false,
     super.key,
   });
 
@@ -20,6 +21,7 @@ class DiceVisual extends StatelessWidget {
   final bool compact;
   final bool selected;
   final bool used;
+  final bool showLevel;
 
   IconData get _icon => switch (dice.ability) {
     DiceAbility.none => Icons.sports_martial_arts,
@@ -118,6 +120,31 @@ class DiceVisual extends StatelessWidget {
                     color: foreground,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            if (showLevel)
+              Positioned(
+                right: compact ? 5 : 8,
+                bottom: compact ? 5 : 7,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xCC202631),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compact ? 4 : 5,
+                      vertical: 2,
+                    ),
+                    child: Text(
+                      'Ур. ${dice.level}',
+                      style: TextStyle(
+                        color: foreground,
+                        fontSize: compact ? 9 : 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
                 ),
               ),

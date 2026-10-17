@@ -188,9 +188,10 @@ void main() {
 
       expect(state.boxCount(CaseType.artifact), 2);
       expect(state.artifacts[Artifact.truceSeal], 1);
-      expect(state.artifacts[Artifact.ironThread], 3);
+      expect(state.artifacts[Artifact.ironThread], 1);
       expect(Artifact.truceSeal.stackable, isFalse);
-      expect(Artifact.ironThread.rarity, ArtifactRarity.common);
+      expect(Artifact.ironThread.rarity, ArtifactRarity.rare);
+      expect(Artifact.fieldKit.rarity, ArtifactRarity.veryRare);
     });
 
     test(

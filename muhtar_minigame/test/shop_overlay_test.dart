@@ -206,4 +206,21 @@ void main() {
     expect(find.text('Максимум'), findsOneWidget);
     expect(tester.widget<FilledButton>(hotbarButton).onPressed, isNull);
   });
+
+  testWidgets('инвентарь содержит отдельный раздел с картинками скинов', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: UpgradeOverlay(game))),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.drag(find.byType(ListView).first, const Offset(0, -1200));
+    await tester.pump();
+
+    expect(find.text('Скины героя'), findsOneWidget);
+    expect(find.byKey(const ValueKey('skin-image-default')), findsOneWidget);
+    expect(find.byKey(const ValueKey('skin-image-ribka_reward')), findsOneWidget);
+    expect(find.byKey(const ValueKey('skin-image-kartofla')), findsOneWidget);
+    expect(find.byKey(const ValueKey('skin-select-default')), findsOneWidget);
+  });
 }

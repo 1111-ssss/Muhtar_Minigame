@@ -153,9 +153,9 @@ class _BattleOverlayState extends State<BattleOverlay> {
     }
     if (data.fromBoard) {
       return data.index != cell &&
-          data.die.dice.modifier != DiceModifier.heavy &&
+          !data.die.dice.hasModifier(DiceModifier.heavy) &&
           (_battle.board[cell] == null ||
-              _battle.board[cell]!.dice.modifier != DiceModifier.heavy);
+              !_battle.board[cell]!.dice.hasModifier(DiceModifier.heavy));
     }
     return _battle.board[cell] == null && _battle.canPlaceDie(data.index);
   }
@@ -552,8 +552,10 @@ class _BattleOverlayState extends State<BattleOverlay> {
               ),
             ),
           if (_selectedCell != null &&
-              _battle.board[_selectedCell!]?.dice.modifier !=
-                  DiceModifier.heavy)
+              !(_battle.board[_selectedCell!]?.dice.hasModifier(
+                    DiceModifier.heavy,
+                  ) ??
+                  false))
             Positioned(
               left: 112,
               right: 112,
@@ -650,7 +652,7 @@ class _BattleOverlayState extends State<BattleOverlay> {
       Draggable<_DieDrag>(
         data: data,
         maxSimultaneousDrags:
-            _battle.canAct && data.die.dice.modifier != DiceModifier.heavy
+            _battle.canAct && !data.die.dice.hasModifier(DiceModifier.heavy)
             ? 1
             : 0,
         // Центр кости остаётся под указателем, а не та точка, за которую
@@ -1020,7 +1022,7 @@ class _DieFace extends StatelessWidget {
       message:
           '${die.dice.name} · уровень ${die.dice.level}\n'
           '${die.dice.ability.description}\n'
-          '${die.dice.modifier.description}',
+          '${die.dice.activeModifiers.isEmpty ? 'Без модификаторов' : die.dice.activeModifiers.map((modifier) => '${modifier.title}: ${modifier.description}').join('\n')}',
       child: SizedBox(
         width: compact ? 72 : 90,
         height: compact ? 82 : 90,

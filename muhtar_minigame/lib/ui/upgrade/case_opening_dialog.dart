@@ -247,6 +247,12 @@ class _ArtifactChoiceCard extends StatelessWidget {
     child: Padding(
       padding: const EdgeInsets.only(right: 12),
       child: OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          backgroundColor: artifactRarityPalette(artifact.rarity).background,
+          side: BorderSide(
+            color: artifactRarityPalette(artifact.rarity).border,
+          ),
+        ),
         onPressed: () => Navigator.of(context).pop(artifact),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 18),
@@ -427,14 +433,19 @@ class _ModifierRollDialogState extends State<ModifierRollDialog>
 }
 
 class DiceModifierTargetDialog extends StatelessWidget {
-  const DiceModifierTargetDialog({required this.dice, super.key});
+  const DiceModifierTargetDialog({required this.dice, required this.modifier, super.key});
   final List<Dice> dice;
+  final DiceModifier modifier;
 
   @override
   Widget build(BuildContext context) {
     final targets = [
       for (var index = 0; index < dice.length; index++)
-        if (dice[index].modifier == DiceModifier.none) index,
+        if (!dice[index].hasModifier(modifier) &&
+            !dice[index].activeModifiers.any(
+              (current) => current.conflictsWith(modifier),
+            ))
+          index,
     ];
     return AlertDialog(
       title: const Text('Выберите кость из инвентаря'),
