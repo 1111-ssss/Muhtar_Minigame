@@ -173,6 +173,8 @@ void main() {
       state.openArtifactBox();
       final modifier = state.rollModifier();
       expect(modifier, isNot(DiceModifier.none));
+      final pending = GameState()..fromJson(state.toJson());
+      expect(pending.pendingModifier, modifier);
       expect(state.applyPendingModifier(0), isTrue);
       expect(state.dice.first.modifier, modifier);
     });

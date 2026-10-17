@@ -88,6 +88,7 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
   }) async {
     final modifier = state.rollModifier();
     if (modifier == null) return;
+    await widget.game.saveProgress();
     if (showRoll) {
       await showDialog<void>(
         context: context,
@@ -745,7 +746,8 @@ class _InventoryPanel extends StatelessWidget {
                     count: state.boxCount(CaseType.values[item]),
                     pending:
                         CaseType.values[item] == CaseType.artifact &&
-                        state.pendingArtifactChoices.isNotEmpty,
+                        (state.pendingArtifactChoices.isNotEmpty ||
+                            state.hasPendingModifierChoice),
                     disabled: opening,
                     onOpen: () => onOpenCase(CaseType.values[item]),
                   );
