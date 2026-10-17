@@ -134,7 +134,8 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
           (entry) =>
               entry.key != index &&
               entry.value.ability == candidate.ability &&
-              entry.value.level == candidate.level,
+              entry.value.level == candidate.level &&
+              entry.value.modifier == candidate.modifier,
         );
   }
 
@@ -148,7 +149,8 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
         indexes.removeWhere(
           (index) =>
               dice[index].ability != selected.ability ||
-              dice[index].level != selected.level,
+              dice[index].level != selected.level ||
+              dice[index].modifier != selected.modifier,
         );
       }
     }
@@ -169,7 +171,9 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
     if (_selectedDice.length == 1) {
       final first = state.inventory[_selectedDice.first];
       final second = state.inventory[index];
-      if (first.ability != second.ability || first.level != second.level) {
+      if (first.ability != second.ability ||
+          first.level != second.level ||
+          first.modifier != second.modifier) {
         return;
       }
     }

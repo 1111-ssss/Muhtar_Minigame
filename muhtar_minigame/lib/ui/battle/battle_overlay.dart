@@ -440,13 +440,7 @@ class _BattleOverlayState extends State<BattleOverlay> {
   }
 
   Widget _buildBoard(double scale) {
-    final targets = <int>{};
-    for (var source = 0; source < _battle.board.length; source++) {
-      final die = _battle.board[source];
-      if (die?.dice.ability == DiceAbility.upgrade) {
-        targets.addAll(BattleEngine.upgradeTargets(source, die!.dice.level));
-      }
-    }
+    final targets = <int>{..._battle.upgradeTargetCells};
     final active = _dragging ?? _selection;
     if (_dragging?.die.dice.ability == DiceAbility.upgrade) {
       final source =

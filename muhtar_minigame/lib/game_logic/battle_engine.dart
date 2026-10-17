@@ -216,8 +216,18 @@ class BattleEngine extends ChangeNotifier {
     notifyListeners();
   }
 
-  RolledDie? _drawDie() {
-    final candidates = _availableDice;
+  RolledDie? _drawDie({Iterable<RolledDie?> excluded = const []}) {
+    final excludedIds = {
+      for (final die in excluded)
+        if (die != null && die.dice.modifier != DiceModifier.none) die.dice.id,
+    };
+    final candidates = _availableDice
+        .where(
+          (die) =>
+              die.modifier == DiceModifier.none ||
+              !excludedIds.contains(die.id),
+        )
+        .toList();
     if (candidates.isEmpty) return null;
     final die = candidates[_random.nextInt(candidates.length)];
     if (die.ability == DiceAbility.doctor) _healingDieDrawn = true;
@@ -236,15 +246,26 @@ class BattleEngine extends ChangeNotifier {
     // Энергия не накапливается: каждый новый раунд начинается ровно с двух.
     energy = maxEnergy;
     _chooseRootedCells();
-    final drawnSources = <String>{};
+    final drawnSources = <String>{
+      for (final die in _hotbar)
+        if (die?.dice.modifier != DiceModifier.none) die!.dice.id,
+    };
     for (var index = 0; index < hotbarSize; index++) {
       if (_hotbar[index] == null && _availableDice.isNotEmpty) {
         final candidates = _availableDice
             .where((dice) => !drawnSources.contains(dice.id))
             .toList();
-        final source = candidates.isEmpty
-            ? _availableDice[_random.nextInt(_availableDice.length)]
-            : candidates[_random.nextInt(candidates.length)];
+        final fallbackCandidates = _availableDice
+            .where(
+              (dice) =>
+                  dice.modifier == DiceModifier.none ||
+                  !drawnSources.contains(dice.id),
+            )
+            .toList();
+        if (candidates.isEmpty && fallbackCandidates.isEmpty) break;
+        final source = candidates.isNotEmpty
+            ? candidates[_random.nextInt(candidates.length)]
+            : fallbackCandidates[_random.nextInt(fallbackCandidates.length)];
         drawnSources.add(source.id);
         if (source.ability == DiceAbility.doctor) _healingDieDrawn = true;
         final minimum = source.level.clamp(1, 6).toInt();
@@ -448,7 +469,12 @@ class BattleEngine extends ChangeNotifier {
         _hotbar[hotbarIndex] == null) {
       return false;
     }
-    final replacement = _drawDie();
+    final replacement = _drawDie(
+      excluded: [
+        for (var index = 0; index < _hotbar.length; index++)
+          if (index != hotbarIndex) _hotbar[index],
+      ],
+    );
     if (replacement == null) return false;
     _hotbar[hotbarIndex] = replacement;
     rerollsRemaining--;
@@ -482,6 +508,23 @@ class BattleEngine extends ChangeNotifier {
     return _targetOrder[cell]
         .take(counts[level.clamp(1, 6).toInt() - 1])
         .toList();
+  }
+
+  Set<int> get upgradeTargetCells {
+    final targets = <int>{};
+    for (var source = 0; source < _board.length; source++) {
+      final die = _board[source];
+      if (die?.dice.ability == DiceAbility.upgrade) {
+        targets.addAll(upgradeTargets(source, die!.dice.level));
+      }
+    }
+    for (final entry in _glassDice) {
+      final die = entry.value;
+      if (die.dice.ability == DiceAbility.upgrade) {
+        targets.addAll(upgradeTargets(entry.key, die.dice.level));
+      }
+    }
+    return Set.unmodifiable(targets);
   }
 
   /// Усиление только на этот раунд. Каждая кость улучшения добавляет к целевой
@@ -697,12 +740,12 @@ class BattleEngine extends ChangeNotifier {
     enemy.hp = result.enemy.hp;
     enemy.burn = result.enemy.burn;
     _over = player.isDead || enemy.isDead;
+    _advanceBoard();
     if (_over) {
       _board.fillRange(0, 9, null);
       _glassDice.clear();
       _rootedCells.clear();
     } else {
-      _advanceBoard();
       round++;
       _prepareRound();
     }
