@@ -248,7 +248,8 @@ class BattleEngine extends ChangeNotifier {
     _chooseRootedCells();
     final drawnSources = <String>{
       for (final die in _hotbar)
-        if (die?.dice.modifier != DiceModifier.none) die!.dice.id,
+        if (die != null && die.dice.modifier != DiceModifier.none)
+          die.dice.id,
     };
     for (var index = 0; index < hotbarSize; index++) {
       if (_hotbar[index] == null && _availableDice.isNotEmpty) {
