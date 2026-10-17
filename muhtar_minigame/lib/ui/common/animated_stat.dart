@@ -45,7 +45,7 @@ class AnimatedStat extends StatelessWidget {
             ? const SizedBox.shrink(key: ValueKey('hidden'))
             : Semantics(
                 key: ValueKey(value),
-                label: '$label: $value',
+                label: '$label: ${valueText ?? value}',
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

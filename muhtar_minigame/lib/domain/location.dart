@@ -7,7 +7,8 @@ import 'package:flutter/foundation.dart';
 ///   3 — дерево (непроходимо), 4 — переход на другую локацию,
 ///   5 — пустота за контуром карты, 6 — вода, 7 — серый приподнятый край,
 ///   8 — рельсы, 9 — земля, 10 — каменная плитка, 11 — деревянный настил,
-///   12 — песок, 13 — цветочный луг, 14 — гравий.
+///   12 — песок, 13 — цветочный луг, 14 — гравий, 15 — деревянный пол,
+///   16 — светлая плитка, 17 — тёмная плитка.
 ///
 /// TODO(сюжет): пользователь будет добавлять сюда новые локации.
 @immutable
@@ -108,7 +109,7 @@ class LocationDef {
 
   /// Проходим ли тайл (для движения и поиска пути).
   bool isWalkable(int col, int row) {
-    const walkable = {0, 2, 4, 8, 9, 10, 11, 12, 13, 14};
+    const walkable = {0, 2, 4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17};
     if (!inBounds(col, row) || !walkable.contains(tiles[row][col])) {
       return false;
     }
@@ -176,7 +177,17 @@ class NpcSpawn {
   final int row;
 }
 
-enum LocationPropKind { tree, rock, bush, platform, bench, trashBin }
+enum LocationPropKind {
+  tree,
+  rock,
+  bush,
+  platform,
+  bench,
+  trashBin,
+  crate,
+  lamp,
+  flowerBed,
+}
 
 @immutable
 class LocationProp {

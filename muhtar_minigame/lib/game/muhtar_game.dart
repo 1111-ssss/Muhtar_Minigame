@@ -83,6 +83,7 @@ class MuhtarGame extends FlameGame
   /// уходит на диск не позже секунды спустя, чтобы закрытие окна не теряло
   /// прогресс между точками сохранения вроде перехода между локациями.
   async.Timer? _autosaveTimer;
+  async.Timer? _tripTimer;
   static const _autosaveDelay = Duration(seconds: 1);
 
   /// Пауза после первого шага перед автоповтором. Она длиннее анимации одного
@@ -107,6 +108,8 @@ class MuhtarGame extends FlameGame
   static const overlayDialog = 'dialog';
   static const overlaySettings = 'settings';
   static const overlayLocationTransition = 'location_transition';
+  static const overlayInsulinChoice = 'insulin_choice';
+  static const overlayTrip = 'trip';
 
   @override
   Future<void> onLoad() async {
@@ -124,6 +127,7 @@ class MuhtarGame extends FlameGame
     overlays.add(overlayHud);
     overlays.add('notifications', priority: 20);
     overlays.add(overlayLocationTransition, priority: 100);
+    if (gameState.tripActive) _showTripOverlay();
     gameState.addListener(_scheduleAutosave);
   }
 
@@ -131,6 +135,7 @@ class MuhtarGame extends FlameGame
   void onRemove() {
     gameState.removeListener(_scheduleAutosave);
     _autosaveTimer?.cancel();
+    _tripTimer?.cancel();
     super.onRemove();
   }
 
@@ -318,6 +323,7 @@ class MuhtarGame extends FlameGame
       overlayShawarmaChoice,
       overlayBattle,
       overlaySettings,
+      overlayInsulinChoice,
     ];
     for (final overlay in closableOverlays) {
       if (!overlays.isActive(overlay)) continue;
@@ -544,6 +550,57 @@ class MuhtarGame extends FlameGame
     overlays.remove(overlaySearch);
   }
 
+  void handleSearchResult(SearchResult result) {
+    if (!result.completed || result.itemId != GameState.insulinSyringeItemId) {
+      return;
+    }
+    closeSearch();
+    openInsulinChoice();
+  }
+
+  void openInsulinChoice() {
+    if (overlays.isActive(overlayInsulinChoice)) return;
+    world_.player.stop();
+    _pressedKeys.clear();
+    _movementKeyOrder.clear();
+    registerWindowCloseHandler(overlayInsulinChoice, closeInsulinChoice);
+    overlays.add(overlayInsulinChoice, priority: 30);
+  }
+
+  void closeInsulinChoice() {
+    unregisterWindowCloseHandler(overlayInsulinChoice);
+    overlays.remove(overlayInsulinChoice);
+  }
+
+  void chooseInsulin({required bool inject}) {
+    closeInsulinChoice();
+    if (inject && gameState.useInsulin()) {
+      notifications.notify(
+        'Вы чувствуете себя ужасно...',
+        type: NotificationType.warning,
+      );
+      _showTripOverlay();
+    }
+    unawaited(saveProgress());
+  }
+
+  void _showTripOverlay() {
+    _tripTimer?.cancel();
+    // Эффект покрывает HUD, но уведомление о находке остаётся поверх него.
+    overlays.add(overlayTrip, priority: 15);
+    final until = gameState.tripUntil;
+    if (until == null) return;
+    final remaining = until.difference(DateTime.now());
+    if (remaining <= Duration.zero) {
+      overlays.remove(overlayTrip);
+      return;
+    }
+    _tripTimer = async.Timer(remaining, () {
+      overlays.remove(overlayTrip);
+      _tripTimer = null;
+    });
+  }
+
   void openSongMiniGame() {
     final progress = gameState.quest('q_song');
     if (progress?.state != QuestState.active ||
@@ -697,6 +754,9 @@ class MuhtarGame extends FlameGame
       attackFaces: archetype.diceFaces,
       baseAttack: archetype.diceFaces.isEmpty ? 0 : archetype.diceFaces.first,
       baseShield: archetype.startingShield,
+      baseHealing: archetype.healingAmount,
+      healingChance: archetype.healingChance,
+      hideStats: archetype.hideStats,
       actsFirst: archetype.actsFirst,
       burnDamage: archetype.appliesBurn ? archetype.burnDamage : 0,
       appearance: enemyEntity.enemyId,
@@ -897,6 +957,10 @@ class MuhtarGame extends FlameGame
     closeSongMiniGame();
     closeDonerAssembly();
     closeVideoSequence();
+    closeInsulinChoice();
+    _tripTimer?.cancel();
+    _tripTimer = null;
+    overlays.remove(overlayTrip);
     unregisterWindowCloseHandler(overlayShawarmaChoice);
     overlays.remove(overlayShawarmaChoice);
     _pendingBattleEnemy = null;
@@ -929,6 +993,7 @@ class MuhtarGame extends FlameGame
       overlays.isActive(overlayDonerAssembly) ||
       overlays.isActive(overlayVideoSequence) ||
       overlays.isActive(overlayShawarmaChoice) ||
+      overlays.isActive(overlayInsulinChoice) ||
       overlays.isActive(overlayUpgrade) ||
       overlays.isActive(overlayInventory) ||
       overlays.isActive(overlayQuests) ||

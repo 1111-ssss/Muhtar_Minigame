@@ -22,6 +22,9 @@ class EnemyArchetype {
     this.attackPhrases = const [],
     this.rootCells = 0,
     this.coinStealChance = 0,
+    this.healingAmount = 0,
+    this.healingChance = 0,
+    this.hideStats = false,
   });
 
   final String id;
@@ -54,4 +57,11 @@ class EnemyArchetype {
 
   /// Вероятность кражи монет при атаке, если механика врага её использует.
   final double coinStealChance;
+
+  /// Лечение врага в конце раунда и вероятность его попытки.
+  final int healingAmount;
+  final double healingChance;
+
+  /// Скрывает preview боевых статов, оставляя HP, имя и реплику.
+  final bool hideStats;
 }

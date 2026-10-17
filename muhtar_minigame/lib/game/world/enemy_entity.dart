@@ -15,17 +15,19 @@ class EnemyEntity extends MapEntity {
          color:
              color ??
              switch (enemyId) {
-               'shaurmek' => const Color(0xFFE07A42),
-               'viktor_korneplod' => const Color(0xFF7B8F43),
-               'gopnik' => const Color(0xFF3949AB),
+                'shaurmek' => const Color(0xFFE07A42),
+                'viktor_korneplod' => const Color(0xFF7B8F43),
+                'sofia' => const Color(0xFFF8F8F4),
+                'gopnik' => const Color(0xFF3949AB),
                _ => const Color(0xFFEF5350),
              },
          kind: switch (enemyId) {
            'slime' => MapEntityKind.slime,
            'goblin' => MapEntityKind.goblin,
            'gopnik' => MapEntityKind.gopnik,
-           'shaurmek' => MapEntityKind.shaurmek,
-           'viktor_korneplod' => MapEntityKind.viktorKorneplod,
+            'shaurmek' => MapEntityKind.shaurmek,
+            'viktor_korneplod' => MapEntityKind.viktorKorneplod,
+            'sofia' => MapEntityKind.sofia,
            _ => MapEntityKind.character,
          },
        );

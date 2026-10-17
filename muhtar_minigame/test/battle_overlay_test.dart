@@ -53,12 +53,17 @@ void main() {
     }
   }
 
-  BattleEngine buildBattle({int rootCells = 0, int enemyAttack = 3}) {
+  BattleEngine buildBattle({
+    int rootCells = 0,
+    int enemyAttack = 3,
+    List<Dice>? dice,
+    int playerDiceCount = 1,
+  }) {
     final engine = BattleEngine(
       player: Fighter(
         name: 'Герой',
         maxHp: 30,
-        dice: [GameContent.starterDice],
+        dice: dice ?? [GameContent.starterDice],
         isPlayer: true,
         attackPhrases: const ['Фраза героя один', 'Фраза героя два'],
       ),
@@ -69,7 +74,7 @@ void main() {
         attackPhrases: const ['Фраза врага один', 'Фраза врага два'],
         rootCells: rootCells,
       ),
-      playerDiceCount: 1,
+      playerDiceCount: playerDiceCount,
       random: rootCells == 0 ? null : Random(4),
     );
     game.battle = engine;
@@ -136,6 +141,35 @@ void main() {
 
     await tester.pump(const Duration(seconds: 4));
     expect(battle.round, 2, reason: 'ход должен разыграться до конца');
+  });
+
+  testWidgets('недоступная после расхода энергии кость затемняет только себя', (
+    tester,
+  ) async {
+    final battle = buildBattle(
+      playerDiceCount: 3,
+      dice: [
+        GameContent.starterDice,
+        GameContent.emberDice,
+        GameContent.guardianDice,
+      ],
+    );
+    await pumpBattle(tester);
+
+    expect(battle.placeDie(0, 0), isTrue);
+    expect(battle.placeDie(1, 1), isTrue);
+    await tester.pump();
+
+    expect(battle.energy, 0);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('battle-hotbar')),
+        matching: find.byType(ColorFiltered),
+      ),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('battle-board')), findsOneWidget);
+    expect(find.byKey(const ValueKey('battle-energy')), findsOneWidget);
   });
 
   testWidgets('после победы Enter закрывает окно боя', (tester) async {

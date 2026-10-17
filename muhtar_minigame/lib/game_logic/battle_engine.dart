@@ -93,6 +93,8 @@ class Fighter {
     this.baseAttack = 0,
     this.baseShield = 0,
     this.baseHealing = 0,
+    this.healingChance = 1,
+    this.hideStats = false,
     this.actsFirst = false,
     this.burnDamage = 0,
     this.appearance = 'player',
@@ -112,6 +114,8 @@ class Fighter {
   final int baseAttack;
   final int baseShield;
   final int baseHealing;
+  final double healingChance;
+  final bool hideStats;
   final bool actsFirst;
   final int burnDamage;
   final String appearance;
@@ -286,7 +290,10 @@ class BattleEngine extends ChangeNotifier {
           ? enemy.baseAttack
           : enemy.attackFaces[_random.nextInt(enemy.attackFaces.length)],
       shield: enemy.baseShield,
-      heal: enemy.baseHealing,
+      heal: enemy.baseHealing > 0 &&
+              _random.nextDouble() < enemy.healingChance
+          ? enemy.baseHealing
+          : 0,
       burn: enemy.burnDamage,
     );
     enemy.attackPhrase = _attackPhraseForRound();

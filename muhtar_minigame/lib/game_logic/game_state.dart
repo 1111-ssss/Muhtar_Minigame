@@ -26,6 +26,8 @@ class GameState extends ChangeNotifier {
   static const int caseCost = 30;
   static const int maxDiceBoxLevel = 3;
   static const int maxBushHpReward = 3;
+  static const String insulinSyringeItemId = 'insulin_syringe';
+  static const Duration tripDuration = Duration(minutes: 5);
   static const Duration enemyRespawnDelay = Duration(minutes: 5);
 
   GameState({Random? random}) : _random = random ?? Random() {
@@ -50,6 +52,7 @@ class GameState extends ChangeNotifier {
   final Set<String> _purchasedShopItems = {};
   final Set<String> _defeatedEnemyAccess = {};
   String? _shawarmaOutcome;
+  DateTime? _tripUntil;
   List<Artifact> _pendingArtifactChoices = [];
   bool _pendingModifierChoice = false;
   DiceModifier? _pendingModifier;
@@ -85,7 +88,7 @@ class GameState extends ChangeNotifier {
   int get xp => _xp;
   int get level => _level;
   String get playerName => GameContent.playerNameForLevel(_level);
-  int get playerMaxHp => 30 + (_level - 1) * 10 + _bonusMaxHp;
+  int get playerMaxHp => 30 + (_level - 1) * 3 + _bonusMaxHp;
   int get playerHp => _playerHp.clamp(0, playerMaxHp).toInt();
   int get dicePerTurn => _dicePerTurn.clamp(1, maxDicePerTurn).toInt();
   int get rerollsPerRound =>
@@ -98,6 +101,9 @@ class GameState extends ChangeNotifier {
   Map<String, int> get items => Map.unmodifiable(_items);
   int itemCount(String itemId) => _items[itemId] ?? 0;
   bool hasItem(String itemId) => itemCount(itemId) > 0;
+  DateTime? get tripUntil => _tripUntil;
+  bool get tripActive =>
+      _tripUntil != null && DateTime.now().isBefore(_tripUntil!);
   bool hasPurchasedShopItem(String itemId) =>
       _purchasedShopItems.contains(itemId);
 
@@ -518,6 +524,25 @@ class GameState extends ChangeNotifier {
     return true;
   }
 
+  bool useItem(String itemId) {
+    final count = itemCount(itemId);
+    if (count <= 0) return false;
+    if (count == 1) {
+      _items.remove(itemId);
+    } else {
+      _items[itemId] = count - 1;
+    }
+    notifyListeners();
+    return true;
+  }
+
+  bool useInsulin() {
+    if (!useItem(insulinSyringeItemId)) return false;
+    _tripUntil = DateTime.now().add(tripDuration);
+    notifyListeners();
+    return true;
+  }
+
   bool removeItem(String itemId) {
     final count = itemCount(itemId);
     if (count <= 0) return false;
@@ -880,6 +905,7 @@ class GameState extends ChangeNotifier {
     },
     'items': Map<String, int>.from(_items),
     'shawarmaOutcome': _shawarmaOutcome,
+    'tripUntil': _tripUntil?.toIso8601String(),
     'purchasedShopItems': _purchasedShopItems.toList(),
     'pendingArtifactChoices': [
       for (final artifact in _pendingArtifactChoices) artifact.name,
@@ -1044,6 +1070,10 @@ class GameState extends ChangeNotifier {
         const {'eaten', 'forIlya', 'delivered'}.contains(shawarmaOutcome)
         ? shawarmaOutcome
         : null;
+    final tripUntil = DateTime.tryParse(json['tripUntil']?.toString() ?? '');
+    _tripUntil = tripUntil != null && tripUntil.isAfter(DateTime.now())
+        ? tripUntil
+        : null;
     _purchasedShopItems
       ..clear()
       ..addAll(
@@ -1189,6 +1219,7 @@ class GameState extends ChangeNotifier {
     _items.clear();
     _defeatedEnemyAccess.clear();
     _shawarmaOutcome = null;
+    _tripUntil = null;
     _purchasedShopItems.clear();
     _pendingArtifactChoices = [];
     _pendingModifierChoice = false;

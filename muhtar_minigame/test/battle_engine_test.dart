@@ -36,12 +36,19 @@ void main() {
     isPlayer: true,
   );
 
-  Fighter enemy({bool first = false, int burnDamage = 0}) => Fighter(
+  Fighter enemy({
+    bool first = false,
+    int burnDamage = 0,
+    int baseHealing = 0,
+    double healingChance = 0,
+  }) => Fighter(
     name: 'Враг',
     maxHp: 30,
     attackFaces: const [4],
     actsFirst: first,
     burnDamage: burnDamage,
+    baseHealing: baseHealing,
+    healingChance: healingChance,
     baseShield: 2,
     appearance: 'goblin',
   );
@@ -59,6 +66,17 @@ void main() {
     )..startTurn();
 
     expect(battle.hotbar.single!.value, inInclusiveRange(4, 6));
+  });
+
+  test('лечение врага появляется в preview в конце раунда', () {
+    final battle = BattleEngine(
+      player: player(),
+      enemy: enemy(baseHealing: 5, healingChance: 1),
+      playerDiceCount: 1,
+      random: const _MaxRandom(),
+    )..startTurn();
+
+    expect(battle.previewFor(battle.enemy).healing, 5);
   });
 
   test('боевой движок не принимает больше трёх слотов хотбара', () {

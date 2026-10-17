@@ -8,6 +8,7 @@ import '../../domain/player_skin.dart';
 import '../../domain/shop_item.dart';
 import '../../game/muhtar_game.dart';
 import '../../game_logic/game_state.dart';
+import '../../game_logic/notification_service.dart';
 import '../battle/dice_visual.dart';
 import '../common/animated_overlay.dart';
 import '../common/game_symbols.dart';
@@ -119,6 +120,12 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
 
   void _purchase(String itemId) {
     final purchased = widget.game.gameState.buyShopItem(itemId);
+    if (purchased && itemId == 'doctor_pepper') {
+      widget.game.notifications.notify(
+        'Доктор Пеппер оказался невкусным и отнял 5 HP.',
+        type: NotificationType.warning,
+      );
+    }
     if (purchased && itemId == 'shaurma') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) widget.game.openShawarmaChoice();
@@ -227,6 +234,47 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
       listenable: widget.game.gameState,
       builder: (context, _) {
         final state = widget.game.gameState;
+        if (widget.shop) {
+          return Scaffold(
+            backgroundColor: const Color(0xFF141720),
+            appBar: AppBar(
+              backgroundColor: const Color(0xFF202332),
+              title: Text(
+                switch (widget.shopNpcId) {
+                  'baba_galya' => 'Магазин Бабы Гали',
+                  'alenka' => 'Копеечка · магазин',
+                  'shaurmek' => 'Донер · магазин Шаурмека',
+                  _ => 'Магазин Арианы',
+                },
+              ),
+              leading: IconButton(
+                tooltip: 'Закрыть',
+                onPressed: close,
+                icon: const Icon(Icons.close),
+              ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Center(child: Text('${state.coins} монет')),
+                ),
+              ],
+            ),
+            body: SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+                children: [
+                  _Section('Товары'),
+                  _ShopGrid(
+                    state: state,
+                    npcId: widget.shopNpcId ?? 'ariana',
+                    onPurchase: _purchase,
+                    onUpgrade: _purchaseUpgrade,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
         final visibleDice = _visibleDice(state);
         return Scaffold(
           backgroundColor: const Color(0xFF141720),
@@ -1147,6 +1195,7 @@ class _ItemInventoryTile extends StatelessWidget {
     'sync_async' => 'SyncAsync',
     'alpen_gold' => 'Альпен Гольд',
     'shaurma' => 'Шаурма',
+    'insulin_syringe' => 'Шиприц инсулина',
     _ => itemId,
   };
 
@@ -1155,6 +1204,7 @@ class _ItemInventoryTile extends StatelessWidget {
     'sync_async' => 'Найденный предмет',
     'alpen_gold' => 'Предмет для задания',
     'shaurma' => 'Предмет для задания',
+    'insulin_syringe' => 'Странная находка с моста',
     _ => 'Предмет',
   };
 

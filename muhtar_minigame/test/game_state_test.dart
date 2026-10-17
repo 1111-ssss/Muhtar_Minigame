@@ -58,6 +58,29 @@ void main() {
       expect(state.xp, 50);
     });
 
+    test('каждый новый уровень добавляет 3 к максимальному HP', () {
+      final state = GameState();
+
+      state.addXp(100);
+
+      expect(state.level, 2);
+      expect(state.playerMaxHp, 33);
+    });
+
+    test('шприц с моста можно оставить или использовать один раз', () {
+      final state = GameState(random: const _FixedRandom(0));
+
+      for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
+        state.searchProp('bridge_insulin_bush');
+      }
+
+      expect(state.itemCount(GameState.insulinSyringeItemId), 1);
+      expect(state.useInsulin(), isTrue);
+      expect(state.itemCount(GameState.insulinSyringeItemId), 0);
+      expect(state.tripActive, isTrue);
+      expect(state.useInsulin(), isFalse);
+    });
+
     test('upgradeDice тратит монеты и повышает уровень', () {
       final state = GameState();
       state.addCoins(100);

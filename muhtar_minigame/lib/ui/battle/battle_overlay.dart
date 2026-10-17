@@ -792,6 +792,37 @@ class _BattleOverlayState extends State<BattleOverlay> {
   Widget _hotbarSlot(int index, double scale) {
     final die = _battle.hotbar[index];
     final unavailable = die != null && !_battle.canPlaceDie(index);
+    Widget dieVisual = die == null
+        ? DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.black26,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white12),
+            ),
+          )
+        : _DieFace(
+            die,
+            value: die.value,
+            selected: _selectedHotbar == index,
+            compact: true,
+          );
+    if (unavailable) {
+      // Затемняем локальным слоем только ограниченное лицо кости. Здесь
+      // намеренно нет ColorFiltered/Opacity над Draggable или родительским
+      // overlay: при нулевой энергии нельзя затрагивать всю сцену.
+      dieVisual = ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            dieVisual,
+            const Positioned.fill(
+              child: ColoredBox(color: Color(0x99000000)),
+            ),
+          ],
+        ),
+      );
+    }
     Widget child = SizedBox(
       width: 72,
       height: 82,
@@ -806,20 +837,7 @@ class _BattleOverlayState extends State<BattleOverlay> {
                       _selectedHotbar = _selectedHotbar == index ? null : index;
                       _selectedCell = null;
                     }),
-              child: die == null
-                  ? DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Colors.black26,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white12),
-                      ),
-                    )
-                  : _DieFace(
-                      die,
-                      value: die.value,
-                      selected: _selectedHotbar == index,
-                      compact: true,
-                    ),
+              child: dieVisual,
             ),
           ),
           Positioned(
@@ -851,20 +869,11 @@ class _BattleOverlayState extends State<BattleOverlay> {
         ],
       ),
     );
-    if (die != null) {
+    if (die != null && !unavailable) {
       child = _draggable(
         child,
         _DieDrag(index, false, die, _battle.round),
         scale,
-      );
-    }
-    if (unavailable) {
-      child = ColorFiltered(
-        colorFilter: const ColorFilter.mode(
-          Color(0x99000000),
-          BlendMode.darken,
-        ),
-        child: Opacity(opacity: .52, child: child),
       );
     }
     return child;
@@ -1262,29 +1271,64 @@ class _FighterPanelState extends State<_FighterPanel>
                 color: const Color(0xFFFF6A86),
                 alwaysVisible: true,
               ),
-              AnimatedStat(
+              fighter.hideStats
+                  ? _unknownStat(
+                      key: const ValueKey('attack-unknown'),
+                      symbol: GameSymbol.sword,
+                      label: 'Нанесёт урон',
+                      color: const Color(0xFFFFD281),
+                    )
+                  : AnimatedStat(
                 key: const ValueKey('attack'),
                 symbol: GameSymbol.sword,
                 value: preview.outgoingDamage,
                 label: 'Нанесёт урон',
                 color: const Color(0xFFFFD281),
               ),
-              AnimatedStat(
+              fighter.hideStats
+                  ? _unknownStat(
+                      key: const ValueKey('incoming-unknown'),
+                      symbol: GameSymbol.incoming,
+                      label: 'Потеряет HP',
+                      color: const Color(0xFFFF946E),
+                    )
+                  : AnimatedStat(
                 key: const ValueKey('incoming'),
                 symbol: GameSymbol.incoming,
                 value: preview.incomingDamage,
                 label: 'Потеряет HP',
                 color: const Color(0xFFFF946E),
               ),
-              _shieldStat(side: side, value: preview.availableShield),
-              AnimatedStat(
+              fighter.hideStats
+                  ? _unknownStat(
+                      key: const ValueKey('shield-unknown'),
+                      symbol: GameSymbol.shield,
+                      label: 'Доступный щит',
+                      color: const Color(0xFF8BC8FF),
+                    )
+                  : _shieldStat(side: side, value: preview.availableShield),
+              fighter.hideStats
+                  ? _unknownStat(
+                      key: const ValueKey('heal-unknown'),
+                      symbol: GameSymbol.heal,
+                      label: 'Вылечит в конце',
+                      color: const Color(0xFF70DC9C),
+                    )
+                  : AnimatedStat(
                 key: const ValueKey('heal'),
                 symbol: GameSymbol.heal,
                 value: preview.healing,
                 label: 'Вылечит в конце',
                 color: const Color(0xFF70DC9C),
               ),
-              AnimatedStat(
+              fighter.hideStats
+                  ? _unknownStat(
+                      key: const ValueKey('fire-unknown'),
+                      symbol: GameSymbol.fire,
+                      label: 'Наложит горение',
+                      color: const Color(0xFFFF885A),
+                    )
+                  : AnimatedStat(
                 key: const ValueKey('fire'),
                 symbol: GameSymbol.fire,
                 value: preview.burnApplied,
@@ -1404,6 +1448,21 @@ class _FighterPanelState extends State<_FighterPanel>
       child: stat,
     );
   }
+
+  Widget _unknownStat({
+    required Key key,
+    required GameSymbol symbol,
+    required String label,
+    required Color color,
+  }) => AnimatedStat(
+    key: key,
+    symbol: symbol,
+    value: 1,
+    valueText: '?',
+    alwaysVisible: true,
+    label: label,
+    color: color,
+  );
 }
 
 class _KartoflaPortraitPainter extends CustomPainter {

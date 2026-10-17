@@ -106,7 +106,8 @@ class IsometricMap extends Component {
 
   /// Генерирует горизонтальную полоску из ромбовидных тайлов. Тайл 5 —
   /// прозрачная пустота, 6 — вода, 7 — серый приподнятый край моста,
-  /// 9 — плоская земля берегов, 13 — травяная площадка.
+  /// 9 — плоская земля берегов, 13 — травяная площадка, 15 — деревянный
+  /// пол, 16–17 — два цвета плитки.
   static Future<Image> _generateTileSheet(String style) async {
     final pictureRecorder = PictureRecorder();
     final canvas = Canvas(pictureRecorder);
@@ -136,6 +137,9 @@ class IsometricMap extends Component {
       const Color(0xFFD8C08A), // 12 песок
       const Color(0xFF4C9A4C), // 13 цветочный луг
       const Color(0xFF8A8578), // 14 гравий
+      const Color(0xFF9B6B45), // 15 деревянный пол
+      const Color(0xFFC8CDD2), // 16 светлая плитка
+      const Color(0xFF59616B), // 17 тёмная плитка
     ];
 
     final pixelPaint = Paint()..isAntiAlias = false;
@@ -312,6 +316,28 @@ class IsometricMap extends Component {
           pixelPaint.color = const Color(0x55A8A295);
           canvas.drawRect(Rect.fromLTWH(offsetX + 24, 18, 5, 3), pixelPaint);
           canvas.drawRect(Rect.fromLTWH(offsetX + 46, 22, 6, 3), pixelPaint);
+          break;
+        case 15: // деревянный пол: широкие доски с тёмными стыками
+          pixelPaint.color = const Color(0x77552D20);
+          for (var plank = 0; plank < 4; plank++) {
+            canvas.drawRect(
+              Rect.fromLTWH(offsetX + 9, (8 + plank * 7).toDouble(), 62, 2),
+              pixelPaint,
+            );
+          }
+          pixelPaint.color = const Color(0x559E7049);
+          canvas.drawRect(Rect.fromLTWH(offsetX + 20, 14, 3, 2), pixelPaint);
+          canvas.drawRect(Rect.fromLTWH(offsetX + 49, 27, 4, 2), pixelPaint);
+          break;
+        case 16: // светлая плитка: аккуратные швы
+          pixelPaint.color = const Color(0x665E6871);
+          canvas.drawRect(Rect.fromLTWH(offsetX + 11, 19, 58, 2), pixelPaint);
+          canvas.drawRect(Rect.fromLTWH(offsetX + 39, 8, 2, 24), pixelPaint);
+          break;
+        case 17: // тёмная плитка: светлые швы
+          pixelPaint.color = const Color(0x667F8993);
+          canvas.drawRect(Rect.fromLTWH(offsetX + 11, 19, 58, 2), pixelPaint);
+          canvas.drawRect(Rect.fromLTWH(offsetX + 39, 8, 2, 24), pixelPaint);
           break;
       }
     }
@@ -630,8 +656,123 @@ class IsometricMap extends Component {
         }
       case LocationPropKind.trashBin:
         _renderTrashBin(canvas, position, prop.variant);
+      case LocationPropKind.crate:
+        _renderCrate(canvas, position, prop.variant);
+      case LocationPropKind.lamp:
+        _renderLamp(canvas, position, prop.variant);
+      case LocationPropKind.flowerBed:
+        _renderFlowerBed(canvas, position, prop.variant);
     }
     canvas.restore();
+  }
+
+  void _renderCrate(Canvas canvas, Vector2 position, int variant) {
+    final paint = Paint()..isAntiAlias = false;
+    paint.color = const Color(0x550F1A12);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(position.x + 2, position.y + 6),
+        width: 34,
+        height: 11,
+      ),
+      paint,
+    );
+    paint.color = variant.isEven
+        ? const Color(0xFF9A653D)
+        : const Color(0xFF6F7882);
+    canvas.drawRect(
+      Rect.fromCenter(
+        center: Offset(position.x, position.y - 5),
+        width: 27,
+        height: 24,
+      ),
+      paint,
+    );
+    paint.color = const Color(0xAA3F2B24);
+    paint.style = PaintingStyle.stroke;
+    paint.strokeWidth = 2;
+    canvas.drawLine(
+      Offset(position.x - 12, position.y - 15),
+      Offset(position.x + 12, position.y + 5),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(position.x + 12, position.y - 15),
+      Offset(position.x - 12, position.y + 5),
+      paint,
+    );
+    paint.style = PaintingStyle.fill;
+  }
+
+  void _renderLamp(Canvas canvas, Vector2 position, int variant) {
+    final paint = Paint()..isAntiAlias = false;
+    paint.color = const Color(0x550F1A12);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(position.x, position.y + 6),
+        width: 28,
+        height: 9,
+      ),
+      paint,
+    );
+    paint.color = variant.isEven
+        ? const Color(0xFF3E4650)
+        : const Color(0xFF5D3F32);
+    canvas.drawRect(
+      Rect.fromLTWH(position.x - 2, position.y - 30, 4, 35),
+      paint,
+    );
+    paint.color = const Color(0xFFFFD56A);
+    canvas.drawRect(
+      Rect.fromLTWH(position.x - 8, position.y - 38, 16, 10),
+      paint,
+    );
+    paint.color = const Color(0x99FFF0A8);
+    canvas.drawRect(
+      Rect.fromLTWH(position.x - 5, position.y - 35, 10, 4),
+      paint,
+    );
+  }
+
+  void _renderFlowerBed(Canvas canvas, Vector2 position, int variant) {
+    final paint = Paint()..isAntiAlias = false;
+    paint.color = const Color(0x550F1A12);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(position.x, position.y + 5),
+        width: 44,
+        height: 12,
+      ),
+      paint,
+    );
+    paint.color = variant.isEven
+        ? const Color(0xFF4E392B)
+        : const Color(0xFF304E36);
+    canvas.drawRect(
+      Rect.fromCenter(
+        center: Offset(position.x, position.y - 2),
+        width: 38,
+        height: 12,
+      ),
+      paint,
+    );
+    for (final point in const [
+      Offset(-13, -11),
+      Offset(0, -15),
+      Offset(13, -9),
+    ]) {
+      paint.color = variant.isEven
+          ? const Color(0xFFE9788A)
+          : const Color(0xFFFFD36A);
+      canvas.drawRect(
+        Rect.fromCenter(
+          center: Offset(position.x + point.dx, position.y + point.dy),
+          width: 7,
+          height: 7,
+        ),
+        paint,
+      );
+    }
   }
 
   void _renderPotatoProp(Canvas canvas, Vector2 position, Paint paint) {
