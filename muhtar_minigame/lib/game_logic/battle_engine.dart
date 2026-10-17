@@ -159,7 +159,7 @@ class BattleEngine extends ChangeNotifier {
   final Random _random;
   late final List<RolledDie?> _hotbar;
   final List<RolledDie?> _board = List.filled(9, null);
-  final Map<int, RolledDie> _glassDice = {};
+  final List<MapEntry<int, RolledDie>> _glassDice = [];
   final Set<int> _rootedCells = <int>{};
   final Map<String, int> _legacyAssignments = {};
   List<BattleEvent> lastEvents = const [];
@@ -227,7 +227,9 @@ class BattleEngine extends ChangeNotifier {
 
   List<Dice> get _availableDice => [
     for (final dice in player.dice)
-      if (!_healingDieDrawn || dice.ability != DiceAbility.doctor) dice,
+      if ((!_healingDieDrawn || dice.ability != DiceAbility.doctor) &&
+          !_board.any((rolled) => identical(rolled?.dice, dice)))
+        dice,
   ];
 
   void _prepareRound() {
@@ -316,7 +318,7 @@ class BattleEngine extends ChangeNotifier {
     energy -= _energyCost(die);
     _hotbar[hotbarIndex] = null;
     if (die.dice.modifier == DiceModifier.glass) {
-      _glassDice[cell] = die;
+      _glassDice.add(MapEntry(cell, die));
       final inventoryIndex = player.dice.indexOf(die.dice);
       if (inventoryIndex >= 0) player.dice.removeAt(inventoryIndex);
       onDiceConsumed?.call(die.dice);
@@ -390,7 +392,7 @@ class BattleEngine extends ChangeNotifier {
         return true;
       }
     }
-    for (final entry in _glassDice.entries) {
+    for (final entry in _glassDice) {
       final die = entry.value;
       if (die.dice.ability == DiceAbility.upgrade &&
           upgradeTargets(entry.key, die.dice.level).contains(cell)) {
@@ -502,7 +504,7 @@ class BattleEngine extends ChangeNotifier {
         value += die.value;
       }
     }
-    for (final entry in _glassDice.entries) {
+    for (final entry in _glassDice) {
       final die = entry.value;
       if (die.dice.ability == DiceAbility.upgrade &&
           upgradeTargets(entry.key, die.dice.level).contains(cell)) {
@@ -559,7 +561,7 @@ class BattleEngine extends ChangeNotifier {
       final die = _board[cell];
       if (die != null) applyDie(cell, die);
     }
-    for (final entry in _glassDice.entries) {
+    for (final entry in _glassDice) {
       applyDie(entry.key, entry.value);
     }
     return TurnEffects(attack: attack, shield: shield, heal: heal, burn: burn);

@@ -561,7 +561,7 @@ void main() {
       },
     );
 
-    test('песня открывает наградный скин без кейса', () {
+    test('песня открывает наградный скин без ящика', () {
       final state = GameState();
       expect(state.activateQuest('q_song', npcId: 'ribka'), isTrue);
       expect(state.completeSongQuest(), isTrue);
