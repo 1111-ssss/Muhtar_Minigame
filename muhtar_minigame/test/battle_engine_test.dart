@@ -602,6 +602,59 @@ void main() {
     );
   });
 
+  test('остаток щита переносится между раундами и принимает новый щит', () {
+    final battle = BattleEngine(
+      player: Fighter(
+        name: 'Игрок',
+        maxHp: 30,
+        initialShield: 1,
+        dice: const [
+          Dice(
+            id: 'guardian',
+            name: 'Щит',
+            baseFaces: [3],
+            ability: DiceAbility.guardian,
+          ),
+        ],
+        isPlayer: true,
+      ),
+      enemy: Fighter(name: 'Враг', maxHp: 50, attackFaces: const [0]),
+      random: const _MaxRandom(),
+    )..startTurn();
+
+    expect(battle.placeDie(0, 4), isTrue);
+    expect(battle.previewFor(battle.player).availableShield, 4);
+    battle.endTurn();
+
+    expect(battle.player.shield, 4);
+    expect(battle.placeDie(0, 4), isTrue);
+    expect(battle.previewFor(battle.player).availableShield, 7);
+  });
+
+  test('урон уменьшает накопленный щит, а излишек проходит в HP', () {
+    final battle = BattleEngine(
+      player: Fighter(
+        name: 'Игрок',
+        maxHp: 30,
+        initialHp: 20,
+        initialShield: 5,
+        dice: const [],
+        isPlayer: true,
+      ),
+      enemy: Fighter(
+        name: 'Враг',
+        maxHp: 50,
+        attackFaces: const [8],
+        actsFirst: true,
+      ),
+    )..startTurn();
+
+    battle.endTurn();
+
+    expect(battle.player.shield, 0);
+    expect(battle.player.hp, 17);
+  });
+
   test('железная нить не складывается даже при старом количестве копий', () {
     final battle = BattleEngine(
       player: player(),

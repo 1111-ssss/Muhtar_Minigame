@@ -35,6 +35,7 @@ class BattlePreview {
     this.outgoingDamage = 0,
     this.incomingDamage = 0,
     this.shield = 0,
+    this.availableShield = 0,
     this.blockedDamage = 0,
     this.healing = 0,
     this.burnApplied = 0,
@@ -49,6 +50,9 @@ class BattlePreview {
   /// сколько фактического входящего урона поглотит щит и потому может быть
   /// меньше полного значения щита.
   final int shield;
+
+  /// Щит, который будет доступен после добавления нового щита этого раунда.
+  final int availableShield;
   final int blockedDamage;
   final int healing;
   final int burnApplied;
@@ -629,7 +633,7 @@ class BattleEngine extends ChangeNotifier {
     final truce =
         round == 1 &&
         (artifacts[Artifact.truceSeal] ?? 0) > 0 &&
-        intent.attack <= enemyIntent.shield &&
+        intent.attack <= enemy.shield + enemyIntent.shield &&
         enemy.burn == 0;
     final p = _ResolvedFighter(
       player,
@@ -737,8 +741,10 @@ class BattleEngine extends ChangeNotifier {
     if (lastPlayerDamage > 0) playerHitVersion++;
     if (lastEnemyDamage > 0) enemyHitVersion++;
     player.hp = result.player.hp;
+    player.shield = result.player.shield;
     player.burn = result.player.burn;
     enemy.hp = result.enemy.hp;
+    enemy.shield = result.enemy.shield;
     enemy.burn = result.enemy.burn;
     _over = player.isDead || enemy.isDead;
     _advanceBoard();
@@ -769,12 +775,14 @@ class _ResolvedFighter {
     this.immune = false,
   }) : hp = fighter.hp,
        maxHp = fighter.maxHp,
-       shield = intent.shield;
+       shieldAtStart = fighter.shield + intent.shield,
+       shield = fighter.shield + intent.shield;
 
   final TurnEffects intent;
   final BattleSide side;
   final bool immune;
   final int maxHp;
+  final int shieldAtStart;
   int hp;
   int shield;
   int burn = 0;
@@ -829,6 +837,7 @@ class _ResolvedFighter {
     outgoingDamage: outgoing,
     incomingDamage: incoming,
     shield: intent.shield,
+    availableShield: shieldAtStart,
     blockedDamage: blocked,
     healing: healing,
     burnApplied: burnApplied,

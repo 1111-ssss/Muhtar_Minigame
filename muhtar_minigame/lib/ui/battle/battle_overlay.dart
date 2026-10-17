@@ -294,19 +294,6 @@ class _BattleOverlayState extends State<BattleOverlay> {
                             ),
                           ),
                           Positioned(
-                            right: 20,
-                            top: 54,
-                            child: Text(
-                              'ЭНЕРГИЯ ${_battle.energy}/${BattleEngine.maxEnergy}',
-                              key: const ValueKey('battle-energy'),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF78F3D0),
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                          ),
-                          Positioned(
                             left: 24,
                             top: portrait ? 88 : (designHeight - 480) / 2,
                             child: _FighterPanel(
@@ -652,7 +639,9 @@ class _BattleOverlayState extends State<BattleOverlay> {
       Draggable<_DieDrag>(
         data: data,
         maxSimultaneousDrags:
-            _battle.canAct && !data.die.dice.hasModifier(DiceModifier.heavy)
+            _battle.canAct &&
+                (data.fromBoard || _battle.canPlaceDie(data.index)) &&
+                !data.die.dice.hasModifier(DiceModifier.heavy)
             ? 1
             : 0,
         // Центр кости остаётся под указателем, а не та точка, за которую
@@ -689,95 +678,120 @@ class _BattleOverlayState extends State<BattleOverlay> {
         child: child,
       );
 
-  Widget _buildHotbar(double scale) => Container(
-    key: const ValueKey('battle-hotbar'),
-    height: 116,
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-    decoration: BoxDecoration(
-      color: const Color(0xFF222331),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: const Color(0xFF8D7855), width: 2),
-    ),
-    child: LayoutBuilder(
-      builder: (context, constraints) {
-        const rerollWidth = 90.0;
-        const gap = 12.0;
-        final diceZoneWidth = (constraints.maxWidth - rerollWidth - gap)
-            .clamp(0.0, double.infinity)
-            .toDouble();
-        return Stack(
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: SizedBox(
-                width: diceZoneWidth,
-                height: 96,
-                child: Center(
-                  child: FittedBox(
-                    fit: BoxFit.contain,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (var index = 0; index < _battle.hotbarSize; index++)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 2),
-                            child: _hotbarSlot(index, scale),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: SizedBox(
-                width: rerollWidth,
-                height: 82,
-                child: Tooltip(
-                  message:
-                      'Заменить выбранную кость. Осталось ${_battle.rerollsRemaining}',
-                  child: ExcludeFocus(
-                    child: OutlinedButton(
-                      key: const ValueKey('reroll'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(rerollWidth, 82),
-                        padding: EdgeInsets.zero,
-                      ),
-                      onPressed:
-                          _selectedHotbar != null &&
-                              _battle.canAct &&
-                              _battle.rerollsRemaining > 0
-                          ? () {
-                              if (_battle.rerollDie(_selectedHotbar!)) {
-                                widget.game.audio.play(GameSound.dieReroll);
-                              }
-                            }
-                          : null,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const GameIcon(GameSymbol.reroll, size: 28),
-                          const SizedBox(height: 6),
-                          Text(
-                            '${_battle.rerollsRemaining}',
-                            style: const TextStyle(fontSize: 20),
-                          ),
-                        ],
+  Widget _buildHotbar(double scale) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(left: 18, bottom: 5),
+        child: Text(
+          'ЭНЕРГИЯ ${_battle.energy}/${BattleEngine.maxEnergy}',
+          key: const ValueKey('battle-energy'),
+          style: const TextStyle(
+            fontSize: 14,
+            color: Color(0xFF78F3D0),
+            letterSpacing: 1.2,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+      Container(
+        key: const ValueKey('battle-hotbar'),
+        height: 116,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF222331),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF8D7855), width: 2),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            const rerollWidth = 90.0;
+            const gap = 12.0;
+            final diceZoneWidth = (constraints.maxWidth - rerollWidth - gap)
+                .clamp(0.0, double.infinity)
+                .toDouble();
+            final visibleIndexes = [
+              for (var index = 0; index < _battle.hotbarSize; index++)
+                if (_battle.hotbar[index] != null) index,
+            ];
+            return Stack(
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(
+                    width: diceZoneWidth,
+                    height: 96,
+                    child: Center(
+                      child: FittedBox(
+                        fit: BoxFit.contain,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (final index in visibleIndexes)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                ),
+                                child: _hotbarSlot(index, scale),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-          ],
-        );
-      },
-    ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: SizedBox(
+                    width: rerollWidth,
+                    height: 82,
+                    child: Tooltip(
+                      message:
+                          'Заменить выбранную кость. Осталось ${_battle.rerollsRemaining}',
+                      child: ExcludeFocus(
+                        child: OutlinedButton(
+                          key: const ValueKey('reroll'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(rerollWidth, 82),
+                            padding: EdgeInsets.zero,
+                          ),
+                          onPressed:
+                              _selectedHotbar != null &&
+                                  _battle.canAct &&
+                                  _battle.rerollsRemaining > 0
+                              ? () {
+                                  if (_battle.rerollDie(_selectedHotbar!)) {
+                                    widget.game.audio.play(GameSound.dieReroll);
+                                  }
+                                }
+                              : null,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const GameIcon(GameSymbol.reroll, size: 28),
+                              const SizedBox(height: 6),
+                              Text(
+                                '${_battle.rerollsRemaining}',
+                                style: const TextStyle(fontSize: 20),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    ],
   );
 
   Widget _hotbarSlot(int index, double scale) {
     final die = _battle.hotbar[index];
+    final unavailable = die != null && !_battle.canPlaceDie(index);
     Widget child = SizedBox(
       width: 72,
       height: 82,
@@ -786,7 +800,7 @@ class _BattleOverlayState extends State<BattleOverlay> {
           Positioned.fill(
             child: InkWell(
               key: ValueKey('hotbar-$index'),
-              onTap: die == null || !_battle.canAct
+              onTap: die == null || !_battle.canPlaceDie(index)
                   ? null
                   : () => setState(() {
                       _selectedHotbar = _selectedHotbar == index ? null : index;
@@ -842,6 +856,15 @@ class _BattleOverlayState extends State<BattleOverlay> {
         child,
         _DieDrag(index, false, die, _battle.round),
         scale,
+      );
+    }
+    if (unavailable) {
+      child = ColorFiltered(
+        colorFilter: const ColorFilter.mode(
+          Color(0x99000000),
+          BlendMode.darken,
+        ),
+        child: Opacity(opacity: .52, child: child),
       );
     }
     return child;
@@ -1253,7 +1276,7 @@ class _FighterPanelState extends State<_FighterPanel>
                 label: 'Потеряет HP',
                 color: const Color(0xFFFF946E),
               ),
-              _shieldStat(side: side, value: preview.shield),
+              _shieldStat(side: side, value: preview.availableShield),
               AnimatedStat(
                 key: const ValueKey('heal'),
                 symbol: GameSymbol.heal,
@@ -1364,7 +1387,7 @@ class _FighterPanelState extends State<_FighterPanel>
       key: const ValueKey('shield'),
       symbol: GameSymbol.shield,
       value: value,
-      label: 'Щит на раунд',
+      label: 'Доступный щит',
       color: const Color(0xFF8BC8FF),
     );
     final event = widget.activeEvent;

@@ -157,6 +157,24 @@ void main() {
       }
     });
 
+    test('награда ящика попадает в инвентарь только после завершения прокрутки', () {
+      final state = GameState(random: const _FixedRandom(0))..addCoins(100);
+      expect(state.buyDiceBox(), isTrue);
+      final before = state.inventoryCount;
+      final reward = state.beginDiceBoxOpening();
+
+      expect(reward, isNotNull);
+      expect(state.inventoryCount, before);
+      expect(state.pendingDiceReward, reward);
+
+      final loaded = GameState()..fromJson(state.toJson());
+      expect(loaded.inventoryCount, before);
+      expect(loaded.pendingDiceReward, reward);
+      expect(loaded.claimPendingDiceReward(), isTrue);
+      expect(loaded.inventoryCount, before + 1);
+      expect(loaded.pendingDiceReward, isNull);
+    });
+
     test('ящик артефактов показывает модификатор первым и не стакует уникальные', () {
       final state = GameState(random: const _FixedRandom(0));
       state.addArtifactBoxes(1);

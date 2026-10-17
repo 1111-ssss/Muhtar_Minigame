@@ -32,12 +32,15 @@ class UpgradeOverlay extends StatefulWidget {
 class _UpgradeOverlayState extends State<UpgradeOverlay> {
   bool _opening = false;
   bool _mergeMode = false;
+  _InventoryTab _inventoryTab = _InventoryTab.items;
   final Set<int> _selectedDice = <int>{};
 
   Future<void> _open(CaseType type) async {
     if (_opening) return;
     final state = widget.game.gameState;
-    final dice = type == CaseType.dice ? state.openDiceBox() : null;
+    final dice = type == CaseType.dice
+        ? state.beginDiceBoxOpening()
+        : null;
     final choices = type == CaseType.artifact
         ? state.openArtifactBox()
         : <Artifact>[];
@@ -58,6 +61,9 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
           barrierDismissible: false,
           builder: (_) => DiceCaseDialog(result: dice),
         );
+        if (state.claimPendingDiceReward()) {
+          await widget.game.saveProgress();
+        }
       } else {
         if (state.pendingModifier != null) {
           await _applyPendingModifier(state, showRoll: false);
@@ -128,6 +134,16 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
     setState(() {
       _mergeMode = !_mergeMode;
       _selectedDice.clear();
+    });
+  }
+
+  void _changeInventoryTab(_InventoryTab tab) {
+    setState(() {
+      _inventoryTab = tab;
+      if (tab == _InventoryTab.skins) {
+        _mergeMode = false;
+        _selectedDice.clear();
+      }
     });
   }
 
@@ -265,6 +281,9 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
                         final wide = constraints.maxWidth >= 760;
                         final inventory = _InventoryPanel(
                           state: state,
+                          tab: _inventoryTab,
+                          onTabChanged: _changeInventoryTab,
+                          onSelectSkin: (skinId) => _selectSkin(state, skinId),
                           mergeMode: _mergeMode,
                           selectedDice: _selectedDice,
                           visibleDice: visibleDice,
@@ -282,6 +301,9 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
                                 selectedDice: _selectedDice.toList(),
                               )
                             : _ArtifactPanel(state: state);
+                        if (_inventoryTab == _InventoryTab.skins) {
+                          return inventory;
+                        }
                         if (wide) {
                           return Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -300,11 +322,6 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
                           ],
                         );
                       },
-                    ),
-                    const SizedBox(height: 16),
-                    _SkinSelectionPanel(
-                      state: state,
-                      onSelect: (skinId) => _selectSkin(state, skinId),
                     ),
                   ],
                 ),
@@ -329,8 +346,8 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
   }
 }
 
-class _SkinSelectionPanel extends StatelessWidget {
-  const _SkinSelectionPanel({required this.state, required this.onSelect});
+class _SkinSelectionContent extends StatelessWidget {
+  const _SkinSelectionContent({required this.state, required this.onSelect});
 
   final GameState state;
   final Future<void> Function(String skinId) onSelect;
@@ -340,33 +357,28 @@ class _SkinSelectionPanel extends StatelessWidget {
     final owned = state.ownedSkinIds;
     final selected = state.selectedSkinId;
 
-    return _Panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _PanelTitle('Скины героя', Icons.palette_outlined),
-          const SizedBox(height: 6),
-          const Text(
-            'Второй раздел инвентаря: выберите открытый образ. Картинка героя '
-            'видна сразу.',
-            style: TextStyle(color: Colors.white70),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              for (final skin in GameContent.skinCatalog)
-                _SkinTile(
-                  skin: skin,
-                  owned: owned.contains(skin.id),
-                  selected: selected == skin.id,
-                  onSelect: onSelect,
-                ),
-            ],
-          ),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Выберите открытый образ. Картинка героя видна сразу.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            for (final skin in GameContent.skinCatalog)
+              _SkinTile(
+                skin: skin,
+                owned: owned.contains(skin.id),
+                selected: selected == skin.id,
+                onSelect: onSelect,
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -621,9 +633,14 @@ class _ShopGrid extends StatelessWidget {
   );
 }
 
+enum _InventoryTab { items, skins }
+
 class _InventoryPanel extends StatelessWidget {
   const _InventoryPanel({
     required this.state,
+    required this.tab,
+    required this.onTabChanged,
+    required this.onSelectSkin,
     required this.mergeMode,
     required this.selectedDice,
     required this.visibleDice,
@@ -635,6 +652,9 @@ class _InventoryPanel extends StatelessWidget {
   });
 
   final GameState state;
+  final _InventoryTab tab;
+  final ValueChanged<_InventoryTab> onTabChanged;
+  final Future<void> Function(String skinId) onSelectSkin;
   final bool mergeMode;
   final Set<int> selectedDice;
   final List<int> visibleDice;
@@ -646,6 +666,18 @@ class _InventoryPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (tab == _InventoryTab.skins) {
+      return _Panel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 14),
+            _SkinSelectionContent(state: state, onSelect: onSelectSkin),
+          ],
+        ),
+      );
+    }
     final itemEntries = state.items.entries.toList(growable: false);
     final itemCount = mergeMode
         ? visibleDice.length
@@ -654,42 +686,7 @@ class _InventoryPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Expanded(child: _PanelTitle('Инвентарь', Icons.backpack)),
-              if (mergeMode)
-                IconButton(
-                  tooltip: 'Выйти из режима объединения',
-                  onPressed: onExitMerge,
-                  icon: const Icon(Icons.close),
-                ),
-              FilledButton.icon(
-                onPressed: mergeMode && selectedDice.length == 2
-                    ? onMergePressed
-                    : mergeMode
-                    ? null
-                    : onMergePressed,
-                style: FilledButton.styleFrom(
-                  backgroundColor: mergeMode
-                      ? const Color(0xFF7658E8)
-                      : const Color(0xFF343A52),
-                  foregroundColor: Colors.white,
-                  side: mergeMode
-                      ? const BorderSide(color: Color(0xFFB9A9FF), width: 2)
-                      : null,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                ),
-                icon: Icon(mergeMode ? Icons.auto_awesome : Icons.merge_type),
-                label: Text(
-                  mergeMode
-                      ? selectedDice.length == 2
-                            ? 'Объединить · 2'
-                            : 'Объединение · ${selectedDice.length}/2'
-                      : 'Объединить',
-                ),
-              ),
-            ],
-          ),
+          _buildHeader(),
           const SizedBox(height: 6),
           Text(
             mergeMode
@@ -721,9 +718,10 @@ class _InventoryPanel extends StatelessWidget {
                     type: CaseType.values[item],
                     count: state.boxCount(CaseType.values[item]),
                     pending:
-                        CaseType.values[item] == CaseType.artifact &&
-                        (state.pendingArtifactChoices.isNotEmpty ||
-                            state.hasPendingModifierChoice),
+                        CaseType.values[item] == CaseType.dice
+                            ? state.pendingDiceReward != null
+                            : state.pendingArtifactChoices.isNotEmpty ||
+                                state.hasPendingModifierChoice,
                     disabled: opening,
                     onOpen: () => onOpenCase(CaseType.values[item]),
                   );
@@ -753,6 +751,104 @@ class _InventoryPanel extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildHeader() => Column(
+    children: [
+      Row(
+        children: [
+          const Expanded(child: _PanelTitle('Инвентарь', Icons.backpack)),
+          if (tab == _InventoryTab.items && mergeMode)
+            IconButton(
+              tooltip: 'Выйти из режима объединения',
+              onPressed: onExitMerge,
+              icon: const Icon(Icons.close),
+            ),
+          if (tab == _InventoryTab.items)
+            FilledButton.icon(
+              onPressed: mergeMode && selectedDice.length == 2
+                  ? onMergePressed
+                  : mergeMode
+                  ? null
+                  : onMergePressed,
+              style: FilledButton.styleFrom(
+                backgroundColor: mergeMode
+                    ? const Color(0xFF7658E8)
+                    : const Color(0xFF343A52),
+                foregroundColor: Colors.white,
+                side: mergeMode
+                    ? const BorderSide(color: Color(0xFFB9A9FF), width: 2)
+                    : null,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              icon: Icon(mergeMode ? Icons.auto_awesome : Icons.merge_type),
+              label: Text(
+                mergeMode
+                    ? selectedDice.length == 2
+                          ? 'Объединить · 2'
+                          : 'Объединение · ${selectedDice.length}/2'
+                    : 'Объединить',
+              ),
+            ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      Center(
+        child: DecoratedBox(
+          key: const ValueKey('inventory-tabs'),
+          decoration: BoxDecoration(
+            color: const Color(0xFF171A25),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF4A506D)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _InventoryTabButton(
+                label: 'Предметы',
+                icon: Icons.backpack_outlined,
+                selected: tab == _InventoryTab.items,
+                onPressed: () => onTabChanged(_InventoryTab.items),
+              ),
+              _InventoryTabButton(
+                label: 'Скины',
+                icon: Icons.palette_outlined,
+                selected: tab == _InventoryTab.skins,
+                onPressed: () => onTabChanged(_InventoryTab.skins),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class _InventoryTabButton extends StatelessWidget {
+  const _InventoryTabButton({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => TextButton.icon(
+    onPressed: selected ? null : onPressed,
+    style: TextButton.styleFrom(
+      backgroundColor: selected ? const Color(0xFF3C4261) : Colors.transparent,
+      foregroundColor: selected ? const Color(0xFF9BFFE5) : Colors.white70,
+      disabledForegroundColor: const Color(0xFF9BFFE5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+    ),
+    icon: Icon(icon, size: 17),
+    label: Text(label),
+  );
 }
 
 class _ShopItemPurchase extends StatelessWidget {

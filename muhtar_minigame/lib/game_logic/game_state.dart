@@ -53,6 +53,7 @@ class GameState extends ChangeNotifier {
   List<Artifact> _pendingArtifactChoices = [];
   bool _pendingModifierChoice = false;
   DiceModifier? _pendingModifier;
+  Dice? _pendingDiceReward;
   final Random _random;
   final Set<String> _ownedSkinIds = {};
   String _selectedSkinId = PlayerSkin.defaultSkin.id;
@@ -78,6 +79,7 @@ class GameState extends ChangeNotifier {
       List.unmodifiable(_pendingArtifactChoices);
   bool get hasPendingModifierChoice => _pendingModifierChoice;
   DiceModifier? get pendingModifier => _pendingModifier;
+  Dice? get pendingDiceReward => _pendingDiceReward;
 
   int get coins => _coins;
   int get xp => _xp;
@@ -295,14 +297,30 @@ class GameState extends ChangeNotifier {
 
   /// Награда фиксируется до анимации: закрытие окна не теряет кость и не
   /// позволяет перебросить результат открытия.
-  Dice? openDiceBox() {
+  Dice? beginDiceBoxOpening() {
+    if (_pendingDiceReward != null) return _pendingDiceReward;
     if (boxCount(CaseType.dice) == 0) return null;
     _cases[CaseType.dice] = boxCount(CaseType.dice) - 1;
     final template = GameContent
         .diceCatalog[_random.nextInt(GameContent.diceCatalog.length)];
-    final result = template.copyWith(level: _rollDiceBoxLevel());
-    _dice.add(result);
+    _pendingDiceReward = template.copyWith(level: _rollDiceBoxLevel());
     notifyListeners();
+    return _pendingDiceReward;
+  }
+
+  bool claimPendingDiceReward() {
+    final reward = _pendingDiceReward;
+    if (reward == null) return false;
+    _dice.add(reward);
+    _pendingDiceReward = null;
+    notifyListeners();
+    return true;
+  }
+
+  Dice? openDiceBox() {
+    final result = beginDiceBoxOpening();
+    if (result == null) return null;
+    claimPendingDiceReward();
     return result;
   }
 
@@ -868,6 +886,20 @@ class GameState extends ChangeNotifier {
     ],
     'pendingModifierChoice': _pendingModifierChoice,
     'pendingModifier': _pendingModifier?.name,
+    'pendingDiceReward': _pendingDiceReward == null
+        ? null
+        : {
+            'id': _pendingDiceReward!.id,
+            'name': _pendingDiceReward!.name,
+            'baseFaces': _pendingDiceReward!.baseFaces,
+            'level': _pendingDiceReward!.level,
+            'ability': _pendingDiceReward!.ability.name,
+            'modifier': _pendingDiceReward!.modifier.name,
+            'modifiers': _pendingDiceReward!.activeModifiers
+                .map((modifier) => modifier.name)
+                .toList(),
+            'visualKey': _pendingDiceReward!.visualKey,
+          },
     'currentLocationId': _currentLocationId,
     'ownedSkins': _ownedSkinIds.toList(),
     'selectedSkinId': _selectedSkinId,
@@ -916,6 +948,47 @@ class GameState extends ChangeNotifier {
     ),
   };
 
+  static Dice? _diceFromJson(dynamic raw) {
+    if (raw is! Map) return null;
+    final id = raw['id']?.toString();
+    if (id == null || id.isEmpty) return null;
+    final template = GameContent.diceById(id);
+    final ability = DiceAbility.values.where(
+      (candidate) => candidate.name == raw['ability']?.toString(),
+    );
+    final modifier = DiceModifier.values.where(
+      (candidate) => candidate.name == raw['modifier']?.toString(),
+    );
+    final savedModifiers = <DiceModifier>{};
+    final rawModifiers = raw['modifiers'];
+    if (rawModifiers is List) {
+      for (final value in rawModifiers) {
+        final saved = DiceModifier.values.where(
+          (candidate) => candidate.name == value.toString(),
+        );
+        if (saved.isNotEmpty && saved.first != DiceModifier.none) {
+          savedModifiers.add(saved.first);
+        }
+      }
+    }
+    final rawFaces = raw['baseFaces'];
+    final baseFaces = rawFaces is List
+        ? rawFaces.whereType<int>().toList()
+        : (template?.baseFaces ?? const [1, 2, 3, 4, 5, 6]);
+    return Dice(
+      id: id,
+      name: raw['name']?.toString() ?? template?.name ?? id,
+      baseFaces: baseFaces,
+      level: (raw['level'] as int? ?? 1).clamp(1, Dice.maxLevel).toInt(),
+      ability: ability.isEmpty
+          ? template?.ability ?? DiceAbility.none
+          : ability.first,
+      modifier: modifier.isEmpty ? DiceModifier.none : modifier.first,
+      modifiers: savedModifiers,
+      visualKey: raw['visualKey']?.toString() ?? template?.visualKey ?? 'blade',
+    );
+  }
+
   void fromJson(Map<String, dynamic> json) {
     _cases.clear();
     final cases = (json['boxes'] as Map?) ?? (json['cases'] as Map?) ?? const {};
@@ -944,6 +1017,7 @@ class GameState extends ChangeNotifier {
         ? null
         : pendingModifierValues.first;
     if (_pendingModifier != null) _pendingModifierChoice = true;
+    _pendingDiceReward = null;
     _coins = json['coins'] as int? ?? 50;
     _xp = json['xp'] as int? ?? 0;
     _level = json['level'] as int? ?? 1;
@@ -1067,45 +1141,14 @@ class GameState extends ChangeNotifier {
 
     final diceJson = json['dice'] as List?;
     if (diceJson != null) {
-      _dice = diceJson.map((d) {
-        final id = d['id'] as String;
-        final template = GameContent.diceById(id);
-        final abilityName = d['ability'] as String?;
-        final ability = DiceAbility.values.where(
-          (candidate) => candidate.name == abilityName,
-        );
-        final modifierName = d['modifier'] as String?;
-        final modifier = DiceModifier.values.where(
-          (candidate) => candidate.name == modifierName,
-        );
-        final savedModifiers = <DiceModifier>{};
-        final rawModifiers = d['modifiers'];
-        if (rawModifiers is List) {
-          for (final value in rawModifiers) {
-            final saved = DiceModifier.values.where(
-              (candidate) => candidate.name == value.toString(),
-            );
-            if (saved.isNotEmpty && saved.first != DiceModifier.none) {
-              savedModifiers.add(saved.first);
-            }
-          }
-        }
-        return Dice(
-          id: id,
-          name: d['name'] as String? ?? template?.name ?? id,
-          baseFaces: (d['baseFaces'] as List).cast<int>(),
-          level: (d['level'] as int? ?? 1).clamp(1, Dice.maxLevel).toInt(),
-          ability: ability.isEmpty
-              ? template?.ability ?? DiceAbility.none
-              : ability.first,
-          modifier: modifier.isEmpty ? DiceModifier.none : modifier.first,
-          modifiers: savedModifiers ?? const {},
-          visualKey:
-              d['visualKey'] as String? ?? template?.visualKey ?? 'blade',
-        );
-      }).toList();
+      _dice = [];
+      for (final raw in diceJson) {
+        final dice = _diceFromJson(raw);
+        if (dice != null) _dice.add(dice);
+      }
       if (_dice.isEmpty) _dice = [GameContent.starterDice];
     }
+    _pendingDiceReward = _diceFromJson(json['pendingDiceReward']);
 
     // Полностью пересоздаём карту: неполный или старый JSON не должен
     // оставлять в памяти состояние задания от предыдущего сейва.
@@ -1150,6 +1193,7 @@ class GameState extends ChangeNotifier {
     _pendingArtifactChoices = [];
     _pendingModifierChoice = false;
     _pendingModifier = null;
+    _pendingDiceReward = null;
     _ownedSkinIds
       ..clear()
       ..add(PlayerSkin.defaultSkin.id);

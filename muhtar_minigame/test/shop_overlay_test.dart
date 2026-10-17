@@ -214,10 +214,10 @@ void main() {
       MaterialApp(home: Scaffold(body: UpgradeOverlay(game))),
     );
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.drag(find.byType(ListView).first, const Offset(0, -1200));
+    expect(find.text('Скины'), findsOneWidget);
+    await tester.tap(find.text('Скины'));
     await tester.pump();
 
-    expect(find.text('Скины героя'), findsOneWidget);
     expect(find.byKey(const ValueKey('skin-image-default')), findsOneWidget);
     expect(find.byKey(const ValueKey('skin-image-ribka_reward')), findsOneWidget);
     expect(find.byKey(const ValueKey('skin-image-kartofla')), findsOneWidget);
