@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
-/// Последовательный просмотр трёх роликов. Управляющих кнопок у плеера нет:
-/// пользователь может только закрыть окно, после чего последовательность
-/// будет начата заново.
+/// Последовательный просмотр трёх роликов.
+///
+/// Переход к следующему ролику остаётся автоматическим, но пауза и звук
+/// теперь управляются отдельно от media_kit controls. Пропуск по-прежнему
+/// недоступен: все три ролика нужны для завершения задания.
 class VideoSequenceOverlay extends StatefulWidget {
   const VideoSequenceOverlay({
     required this.onCompleted,
@@ -38,7 +40,9 @@ class _VideoSequenceOverlayState extends State<VideoSequenceOverlay> {
   Object? _error;
   bool _videoReady = false;
   bool _advancing = false;
-  double _aspectRatio = 16 / 9;
+  bool _paused = false;
+  bool _muted = false;
+  double _aspectRatio = 704 / 1280;
 
   @override
   void initState() {
@@ -86,7 +90,8 @@ class _VideoSequenceOverlayState extends State<VideoSequenceOverlay> {
       _videoIndex = index;
       _error = null;
       _videoReady = false;
-      _aspectRatio = 16 / 9;
+      _paused = false;
+      _aspectRatio = 704 / 1280;
     });
 
     final player = Player();
@@ -119,6 +124,11 @@ class _VideoSequenceOverlayState extends State<VideoSequenceOverlay> {
         return;
       }
 
+      try {
+        await player.setVolume(_muted ? 0 : 100);
+      } catch (_) {
+        // Громкость не должна превращать успешно открытый ролик в ошибку.
+      }
       final params = player.state.videoParams;
       final aspectRatio = _videoAspectRatio(params);
       setState(() {
@@ -184,6 +194,36 @@ class _VideoSequenceOverlayState extends State<VideoSequenceOverlay> {
     });
   }
 
+  Future<void> _togglePause() async {
+    final player = _player;
+    if (player == null || !_videoReady || _error != null) return;
+    try {
+      if (_paused) {
+        await player.play();
+      } else {
+        await player.pause();
+      }
+      if (!mounted || !identical(_player, player)) return;
+      setState(() => _paused = !_paused);
+    } catch (_) {
+      // Ошибка управления не должна закрывать уже загруженный ролик.
+    }
+  }
+
+  Future<void> _toggleMute() async {
+    final player = _player;
+    if (player == null || _error != null) return;
+    final muted = !_muted;
+    try {
+      await player.setVolume(muted ? 0 : 100);
+      if (!mounted || !identical(_player, player)) return;
+      setState(() => _muted = muted);
+    } catch (_) {
+      // Если платформа не поддерживает изменение громкости, оставляем UI
+      // в прежнем состоянии и позволяем ролику продолжить воспроизведение.
+    }
+  }
+
   static bool _hasVideoDimensions(VideoParams params) {
     final width = params.w ?? params.dw;
     final height = params.h ?? params.dh;
@@ -246,18 +286,71 @@ class _VideoSequenceOverlayState extends State<VideoSequenceOverlay> {
                 ],
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+              child: Semantics(
+                label:
+                    'Прогресс просмотра: ролик ${_videoIndex + 1} из ${VideoSequenceOverlay.videoAssets.length}',
+                child: Row(
+                  children: [
+                    for (var index = 0;
+                        index < VideoSequenceOverlay.videoAssets.length;
+                        index++)
+                      Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              right: index ==
+                                      VideoSequenceOverlay.videoAssets.length - 1
+                                  ? 0
+                                  : 5,
+                            ),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: index <= _videoIndex
+                                  ? const Color(0xFF62E6E8)
+                                  : const Color(0xFF283442),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
             Expanded(
               child: Center(
                 child: _error != null
-                    ? _ErrorPanel(error: _error!)
+                    ? _ErrorPanel(
+                        error: _error!,
+                        onRetry: () => unawaited(_loadVideo(_videoIndex)),
+                      )
                     : controller == null || !_videoReady
-                    ? const CircularProgressIndicator(color: Color(0xFF62E6E8))
+                    ? Semantics(
+                        label:
+                            'Загрузка ролика ${_videoIndex + 1} из ${VideoSequenceOverlay.videoAssets.length}',
+                        child: const CircularProgressIndicator(
+                          color: Color(0xFF62E6E8),
+                        ),
+                      )
                     : _VideoFrame(
                         controller: controller,
                         aspectRatio: _aspectRatio,
                       ),
               ),
             ),
+            if (_videoReady && _error == null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 4),
+                child: _PlaybackControls(
+                  paused: _paused,
+                  muted: _muted,
+                  onPause: _togglePause,
+                  onMute: _toggleMute,
+                ),
+              ),
             const Padding(
               padding: EdgeInsets.fromLTRB(18, 8, 18, 18),
               child: Text(
@@ -304,10 +397,66 @@ class _VideoFrame extends StatelessWidget {
   }
 }
 
+class _PlaybackControls extends StatelessWidget {
+  const _PlaybackControls({
+    required this.paused,
+    required this.muted,
+    required this.onPause,
+    required this.onMute,
+  });
+
+  final bool paused;
+  final bool muted;
+  final VoidCallback onPause;
+  final VoidCallback onMute;
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: const BoxConstraints(maxWidth: 520),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Semantics(
+            label: paused ? 'Продолжить ролик' : 'Поставить ролик на паузу',
+            button: true,
+            child: FilledButton.icon(
+              key: const ValueKey('video-toggle-pause'),
+              onPressed: onPause,
+              icon: Icon(paused ? Icons.play_arrow : Icons.pause),
+              label: Text(paused ? 'Продолжить' : 'Пауза'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF62E6E8),
+                foregroundColor: const Color(0xFF071519),
+                minimumSize: const Size.fromHeight(48),
+                textStyle: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Semantics(
+          label: muted ? 'Включить звук' : 'Выключить звук',
+          button: true,
+          child: IconButton(
+            key: const ValueKey('video-toggle-mute'),
+            tooltip: muted ? 'Включить звук' : 'Выключить звук',
+            onPressed: onMute,
+            icon: Icon(muted ? Icons.volume_off : Icons.volume_up),
+            color: Colors.white70,
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _ErrorPanel extends StatelessWidget {
-  const _ErrorPanel({required this.error});
+  const _ErrorPanel({required this.error, required this.onRetry});
 
   final Object error;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -348,6 +497,13 @@ class _ErrorPanel extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white38, fontSize: 11),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                key: const ValueKey('video-retry'),
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Повторить ролик'),
               ),
             ],
           ),
