@@ -227,20 +227,23 @@ class BattleEngine extends ChangeNotifier {
   RolledDie? _drawDie({Iterable<RolledDie?> excluded = const []}) {
     final excludedIds = {
       for (final die in excluded)
-        if (die != null && die.dice.activeModifiers.isNotEmpty) die.dice.id,
+        if (die != null) die.dice.id,
     };
     final candidates = _availableDice
-        .where(
-          (die) =>
-              die.activeModifiers.isEmpty ||
-              !excludedIds.contains(die.id),
-        )
+        .where((die) => !excludedIds.contains(die.id))
         .toList();
     if (candidates.isEmpty) return null;
     final die = candidates[_random.nextInt(candidates.length)];
     if (die.ability == DiceAbility.doctor) _healingDieDrawn = true;
-    final minimum = die.level.clamp(1, 6).toInt();
-    return RolledDie(dice: die, value: minimum + _random.nextInt(7 - minimum));
+    return _rollDie(die);
+  }
+
+  RolledDie _rollDie(Dice die) {
+    final faces = die.rollFaces;
+    return RolledDie(
+      dice: die,
+      value: faces[_random.nextInt(faces.length)],
+    );
   }
 
   List<Dice> get _availableDice => [
@@ -256,32 +259,18 @@ class BattleEngine extends ChangeNotifier {
     _chooseRootedCells();
     final drawnSources = <String>{
       for (final die in _hotbar)
-        if (die != null && die.dice.activeModifiers.isNotEmpty)
-          die.dice.id,
+        if (die != null) die.dice.id,
     };
     for (var index = 0; index < hotbarSize; index++) {
       if (_hotbar[index] == null && _availableDice.isNotEmpty) {
         final candidates = _availableDice
             .where((dice) => !drawnSources.contains(dice.id))
             .toList();
-        final fallbackCandidates = _availableDice
-            .where(
-              (dice) =>
-                  dice.activeModifiers.isEmpty ||
-                  !drawnSources.contains(dice.id),
-            )
-            .toList();
-        if (candidates.isEmpty && fallbackCandidates.isEmpty) break;
-        final source = candidates.isNotEmpty
-            ? candidates[_random.nextInt(candidates.length)]
-            : fallbackCandidates[_random.nextInt(fallbackCandidates.length)];
+        if (candidates.isEmpty) break;
+        final source = candidates[_random.nextInt(candidates.length)];
         drawnSources.add(source.id);
         if (source.ability == DiceAbility.doctor) _healingDieDrawn = true;
-        final minimum = source.level.clamp(1, 6).toInt();
-        _hotbar[index] = RolledDie(
-          dice: source,
-          value: minimum + _random.nextInt(7 - minimum),
-        );
+        _hotbar[index] = _rollDie(source);
       }
     }
     rerollsRemaining = rerollsPerRound;

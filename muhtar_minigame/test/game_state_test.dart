@@ -30,10 +30,24 @@ void main() {
       final state = GameState();
       expect(state.coins, 50);
       expect(state.level, 1);
-      expect(state.dice.length, 1);
-      expect(state.dice.first.id, 'd6');
+      expect(state.dice, GameContent.starterInventory);
+      expect(
+        state.dice.map((dice) => dice.ability),
+        [DiceAbility.warrior, DiceAbility.doctor, DiceAbility.upgrade],
+      );
+      expect(state.dice.every((dice) => dice.level == 1), isTrue);
       expect(state.playerHp, 30);
       expect(state.playerMaxHp, 30);
+    });
+
+    test('reset возвращает точный стартовый набор костей', () {
+      final state = GameState()..addDiceType('ember');
+
+      state.reset();
+
+      expect(state.dice, GameContent.starterInventory);
+      expect(state.dice.length, 3);
+      expect(state.dice.every((dice) => dice.level == 1), isTrue);
     });
 
     test('addCoins/spendCoins', () {
@@ -108,18 +122,16 @@ void main() {
 
     test('боевой набор увеличивается до шести кубиков разных типов', () {
       final state = GameState()..addCoins(10000);
-      expect(state.addDiceType('doctor'), isTrue);
       expect(state.dice.last.ability, DiceAbility.doctor);
       expect(state.addDiceType('ember'), isTrue);
       expect(state.addDiceType('guardian'), isTrue);
-      expect(state.addDiceType('doctor'), isTrue);
       expect(state.addDiceType('d6'), isTrue);
       expect(state.diceCount, 6);
-      expect(state.addDiceType('d6'), isFalse);
+      expect(state.addDiceType('doctor'), isFalse);
 
       final loaded = GameState()..fromJson(state.toJson());
       expect(loaded.diceCount, 6);
-      expect(loaded.diceTypeCount('doctor'), 2);
+      expect(loaded.diceTypeCount('doctor'), 1);
       expect(loaded.dice[1].ability, DiceAbility.doctor);
     });
 

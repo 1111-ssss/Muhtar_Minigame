@@ -175,6 +175,33 @@ class _BattleOverlayState extends State<BattleOverlay> {
     }
   }
 
+  bool _acceptHotbarDrop(_DieDrag data) {
+    if (!data.fromBoard ||
+        !_battle.canAct ||
+        data.round != _battle.round ||
+        data.index < 0 ||
+        data.index >= _battle.board.length ||
+        !identical(_battle.board[data.index], data.die) ||
+        data.die.dice.hasModifier(DiceModifier.heavy)) {
+      return false;
+    }
+    return _battle.hotbar.any((die) => die == null);
+  }
+
+  void _removeDraggedDie(_DieDrag data) {
+    if (!_acceptHotbarDrop(data)) return;
+    if (_battle.removeDie(data.index)) {
+      widget.game.audio.play(GameSound.ui);
+      if (mounted) {
+        setState(() {
+          _selectedHotbar = null;
+          _selectedCell = null;
+          _hoveredCell = null;
+        });
+      }
+    }
+  }
+
   _DieDrag? get _selection {
     final fromBoard = _selectedCell != null;
     final index = _selectedCell ?? _selectedHotbar;
@@ -667,7 +694,13 @@ class _BattleOverlayState extends State<BattleOverlay> {
         ),
         childWhenDragging: Opacity(opacity: .3, child: child),
         onDragStarted: () => setState(() => _dragging = data),
-        onDragEnd: (_) {
+        onDragEnd: (details) {
+          // Releasing a board die outside a valid board cell is the same as
+          // returning it to the hotbar. This also makes dragging it away from
+          // the board a quick alternative to the explicit remove button.
+          if (data.fromBoard && !details.wasAccepted) {
+            _removeDraggedDie(data);
+          }
           if (mounted) {
             setState(() {
               _dragging = null;
@@ -694,17 +727,26 @@ class _BattleOverlayState extends State<BattleOverlay> {
           ),
         ),
       ),
-      Container(
-        key: const ValueKey('battle-hotbar'),
-        height: 116,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF222331),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF8D7855), width: 2),
-        ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
+       DragTarget<_DieDrag>(
+         onWillAcceptWithDetails: (details) =>
+             _acceptHotbarDrop(details.data),
+         onAcceptWithDetails: (details) => _removeDraggedDie(details.data),
+         builder: (context, candidates, rejected) => Container(
+           key: const ValueKey('battle-hotbar'),
+           height: 116,
+           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+           decoration: BoxDecoration(
+             color: const Color(0xFF222331),
+             borderRadius: BorderRadius.circular(14),
+             border: Border.all(
+               color: candidates.isNotEmpty
+                   ? const Color(0xFF87FFE1)
+                   : const Color(0xFF8D7855),
+               width: 2,
+             ),
+           ),
+           child: LayoutBuilder(
+             builder: (context, constraints) {
             const rerollWidth = 90.0;
             const gap = 12.0;
             final diceZoneWidth = (constraints.maxWidth - rerollWidth - gap)
@@ -783,9 +825,10 @@ class _BattleOverlayState extends State<BattleOverlay> {
                 ),
               ],
             );
-          },
-        ),
-      ),
+             },
+           ),
+         ),
+       ),
     ],
   );
 

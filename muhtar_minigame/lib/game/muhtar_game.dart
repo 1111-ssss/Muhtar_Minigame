@@ -520,6 +520,14 @@ class MuhtarGame extends FlameGame
     if (_endingBattle || battle != null || overlays.isActive(overlaySearch)) {
       return;
     }
+    if (prop.kind == LocationPropKind.bush &&
+        gameState.searchResult(prop.id)?.completed == true) {
+      notifications.notify(
+        'В этом кусте больше ничего нет.',
+        type: NotificationType.info,
+      );
+      return;
+    }
     _searchingProp = prop;
     world_.player.stop();
     _pressedKeys.clear();
@@ -551,6 +559,16 @@ class MuhtarGame extends FlameGame
   }
 
   void handleSearchResult(SearchResult result) {
+    if (result.completed &&
+        result.rewardType == SearchRewardType.none &&
+        _searchingProp?.kind == LocationPropKind.bush) {
+      closeSearch();
+      notifications.notify(
+        'В этом кусте больше ничего нет.',
+        type: NotificationType.info,
+      );
+      return;
+    }
     if (!result.completed || result.itemId != GameState.insulinSyringeItemId) {
       return;
     }

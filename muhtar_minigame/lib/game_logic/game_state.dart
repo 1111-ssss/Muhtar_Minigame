@@ -1176,7 +1176,7 @@ class GameState extends ChangeNotifier {
         final dice = _diceFromJson(raw);
         if (dice != null) _dice.add(dice);
       }
-      if (_dice.isEmpty) _dice = [GameContent.starterDice];
+      if (_dice.isEmpty) _dice = List.of(GameContent.starterInventory);
     }
     _pendingDiceReward = _diceFromJson(json['pendingDiceReward']);
 
@@ -1239,7 +1239,7 @@ class GameState extends ChangeNotifier {
     _dicePerTurn = 1;
     _rerollsPerRound = 1;
     _currentLocationId = 'meadow';
-    _dice = [GameContent.starterDice];
+    _dice = List.of(GameContent.starterInventory);
     _defeatedEnemyKeys = {};
     _enemyRespawnAt = {};
     _quests = {

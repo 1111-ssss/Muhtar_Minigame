@@ -172,6 +172,28 @@ void main() {
     expect(find.byKey(const ValueKey('battle-energy')), findsOneWidget);
   });
 
+  testWidgets('кость можно перетащить с доски обратно в хотбар', (
+    tester,
+  ) async {
+    final battle = buildBattle();
+    await pumpBattle(tester);
+
+    expect(battle.placeDie(0, 4), isTrue);
+    await tester.pump();
+
+    final boardCenter = tester.getCenter(
+      find.byKey(const ValueKey('board-cell-4')),
+    );
+    final hotbarCenter = tester.getCenter(
+      find.byKey(const ValueKey('battle-hotbar')),
+    );
+    await tester.dragFrom(boardCenter, hotbarCenter - boardCenter);
+    await tester.pump();
+
+    expect(battle.board[4], isNull);
+    expect(battle.hotbar.whereType<RolledDie>(), hasLength(1));
+  });
+
   testWidgets('после победы Enter закрывает окно боя', (tester) async {
     final battle = buildBattle();
     await pumpBattle(tester);
@@ -286,7 +308,7 @@ void main() {
       expect(battle.placeDie(doctorIndex, 1), isTrue);
       await tester.pump();
 
-      expect(find.text('знач. 3 → 4'), findsOneWidget);
+      expect(find.text('знач. 1 → 2'), findsOneWidget);
       expect(find.textContaining('ур.'), findsNothing);
       expect(tester.takeException(), isNull);
     },

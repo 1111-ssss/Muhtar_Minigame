@@ -53,7 +53,7 @@ void main() {
     appearance: 'goblin',
   );
 
-  test('новый бросок выбирает случайную грань от уровня до 6', () {
+  test('новый бросок выбирает случайную грань от 1 до уровня', () {
     final battle = BattleEngine(
       player: player(
         dice: const [
@@ -65,7 +65,29 @@ void main() {
       random: Random(1),
     )..startTurn();
 
-    expect(battle.hotbar.single!.value, inInclusiveRange(4, 6));
+    expect(battle.hotbar.single!.value, inInclusiveRange(1, 4));
+  });
+
+  test('хотбар не содержит два броска из одного источника', () {
+    final battle = BattleEngine(
+      player: player(
+        dice: const [
+          Dice(id: 'shared', name: 'Общий источник', baseFaces: [1]),
+          Dice(id: 'shared', name: 'Общий источник', baseFaces: [1]),
+          Dice(id: 'unique', name: 'Уникальный источник', baseFaces: [1]),
+        ],
+      ),
+      enemy: enemy(),
+      playerDiceCount: 3,
+      random: const _MaxRandom(),
+    )..startTurn();
+
+    final sourceIds = [
+      for (final die in battle.hotbar)
+        if (die != null) die.dice.id,
+    ];
+    expect(sourceIds, hasLength(2));
+    expect(sourceIds.toSet(), hasLength(sourceIds.length));
   });
 
   test('лечение врага появляется в preview в конце раунда', () {
@@ -196,7 +218,7 @@ void main() {
     expect(battle.placeDie(1, 4), isTrue);
     expect(battle.board[4], isNull);
     expect(battle.player.dice, hasLength(1));
-    expect(battle.playerIntent.attack, 5);
+    expect(battle.playerIntent.attack, 2);
   });
 
   test('кость лечения выпадает только один раз за бой', () {
@@ -383,11 +405,11 @@ void main() {
       expect(battle.placeDie(0, 1), isTrue);
       expect(battle.board[1]!.dice.level, 3);
       expect(battle.effectiveLevelAt(1), 3);
-      expect(battle.playerIntent.heal, 12);
+      expect(battle.playerIntent.heal, 4);
 
       battle.endTurn();
 
-      expect(battle.player.hp, 22);
+      expect(battle.player.hp, 14);
     },
   );
 
@@ -432,9 +454,9 @@ void main() {
       expect(battle.placeDie(upgradeIndexes[0], 4), isTrue);
       expect(battle.placeDie(upgradeIndexes[1], 0), isTrue);
 
-      expect(battle.board[1]!.value, 6);
-      expect(battle.effectiveValueAt(1), 18);
-      expect(battle.playerIntent.attack, 18);
+      expect(battle.board[1]!.value, 1);
+      expect(battle.effectiveValueAt(1), 3);
+      expect(battle.playerIntent.attack, 3);
     },
   );
 
@@ -465,14 +487,14 @@ void main() {
         random: const _MaxRandom(),
       )..startTurn();
 
-      expect(battle.hotbar.single!.value, 6);
+      expect(battle.hotbar.single!.value, 3);
       expect(battle.placeDie(0, 4), isTrue);
-      expect(battle.playerIntent.heal, 6);
-      expect(battle.previewFor(battle.player).healing, 6);
+      expect(battle.playerIntent.heal, 3);
+      expect(battle.previewFor(battle.player).healing, 3);
 
       battle.endTurn();
 
-      expect(battle.player.hp, 16);
+      expect(battle.player.hp, 13);
     },
   );
 
@@ -497,8 +519,8 @@ void main() {
 
     final battle = doctorBattle(10);
     expect(battle.placeDie(0, 4), isTrue);
-    expect(battle.playerIntent.heal, 8);
-    expect(battle.previewFor(battle.player).healing, 8);
+    expect(battle.playerIntent.heal, 7);
+    expect(battle.previewFor(battle.player).healing, 7);
 
     battle.endTurn();
 
@@ -506,7 +528,7 @@ void main() {
 
     final cappedBattle = doctorBattle(29);
     expect(cappedBattle.placeDie(0, 4), isTrue);
-    expect(cappedBattle.playerIntent.heal, 8);
+    expect(cappedBattle.playerIntent.heal, 7);
     expect(cappedBattle.previewFor(cappedBattle.player).healing, 1);
 
     cappedBattle.endTurn();

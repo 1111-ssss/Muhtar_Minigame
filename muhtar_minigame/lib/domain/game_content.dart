@@ -174,6 +174,14 @@ class GameContent {
     visualKey: 'upgrade',
   );
 
+  /// Кости, с которыми начинается новая игра. Каждый источник представлен
+  /// ровно один раз: атака, доктор и улучшение.
+  static const List<Dice> starterInventory = [
+    starterDice,
+    doctorDice,
+    upgradeDice,
+  ];
+
   /// Архетипы, которые могут выпасть из ящика костей.
   static const List<Dice> diceCatalog = [
     starterDice,

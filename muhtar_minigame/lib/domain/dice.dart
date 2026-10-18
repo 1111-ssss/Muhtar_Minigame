@@ -115,7 +115,8 @@ class Dice {
 
   /// Диапазон броска. Фактическое равномерное значение выбирает движок.
   List<int> get rollFaces {
-    return [for (var face = level.clamp(1, 6).toInt(); face <= 6; face++) face];
+    final maximum = level.clamp(1, maxLevel).toInt();
+    return [for (var face = 1; face <= maximum; face++) face];
   }
 
   static const int maxLevel = 6;
