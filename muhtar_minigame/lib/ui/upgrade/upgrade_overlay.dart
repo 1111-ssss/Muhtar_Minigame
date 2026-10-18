@@ -231,6 +231,7 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
     overlay: widget.shop
         ? MuhtarGame.overlayUpgrade
         : MuhtarGame.overlayInventory,
+    onClosed: widget.shop ? widget.game.restoreLocationMusic : null,
     builder: (context, close) => ListenableBuilder(
       listenable: widget.game.gameState,
       builder: (context, _) {

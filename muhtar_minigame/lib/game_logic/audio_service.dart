@@ -30,6 +30,7 @@ enum MusicTrack {
   donerShop,
   kopeechkaShop,
   cheburechnayaShop,
+  arianaShop,
   college,
   chill,
   retro,
@@ -48,6 +49,7 @@ extension MusicTrackInfo on MusicTrack {
     MusicTrack.donerShop => 'shop_bg_music_1.wav',
     MusicTrack.kopeechkaShop => 'shop_bg_music_2.wav',
     MusicTrack.cheburechnayaShop => 'shop_bg_music_3.wav',
+    MusicTrack.arianaShop => 'shop_bg_music_4.wav',
     MusicTrack.college => 'college_bg_music_1.wav',
     MusicTrack.chill => 'chill_bg_music_1.wav',
     MusicTrack.retro => 'retro_bg_music_1.wav',
@@ -56,6 +58,14 @@ extension MusicTrackInfo on MusicTrack {
     MusicTrack.puzzle => 'puzzle_bg_music_1.wav',
   };
 }
+
+MusicTrack musicTrackForShop(String npcId) => switch (npcId) {
+  'ariana' => MusicTrack.arianaShop,
+  'baba_galya' => MusicTrack.cheburechnayaShop,
+  'alenka' => MusicTrack.kopeechkaShop,
+  'shaurmek' => MusicTrack.donerShop,
+  _ => MusicTrack.donerShop,
+};
 
 MusicTrack musicTrackForLocation(String locationId) => switch (locationId) {
   'meadow' => MusicTrack.station,
@@ -126,6 +136,9 @@ class AudioService extends ChangeNotifier {
 
   Future<void> playLocationMusic(String locationId) =>
       playMusic(musicTrackForLocation(locationId));
+
+  Future<void> playShopMusic(String npcId) =>
+      playMusic(musicTrackForShop(npcId));
 
   Future<void> playBattleMusic({bool boss = false}) =>
       playMusic(boss ? MusicTrack.boss : MusicTrack.fight);

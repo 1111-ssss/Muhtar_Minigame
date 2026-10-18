@@ -8,12 +8,14 @@ class AnimatedOverlay extends StatefulWidget {
     required this.game,
     required this.overlay,
     required this.builder,
+    this.onClosed,
     super.key,
   });
 
   final MuhtarGame game;
   final String overlay;
   final Widget Function(BuildContext context, VoidCallback close) builder;
+  final VoidCallback? onClosed;
 
   @override
   State<AnimatedOverlay> createState() => _AnimatedOverlayState();
@@ -55,7 +57,9 @@ class _AnimatedOverlayState extends State<AnimatedOverlay>
     if (_closing) return;
     _closing = true;
     _controller.reverse().whenCompleteOrCancel(() {
-      if (mounted) widget.game.overlays.remove(widget.overlay);
+      if (!mounted) return;
+      widget.game.overlays.remove(widget.overlay);
+      widget.onClosed?.call();
     });
   }
 

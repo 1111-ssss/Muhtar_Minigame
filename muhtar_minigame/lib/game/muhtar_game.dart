@@ -774,6 +774,7 @@ class MuhtarGame extends FlameGame
   }
 
   void openShawarmaChoice() {
+    restoreLocationMusic();
     overlays.remove(overlayUpgrade);
     registerWindowCloseHandler(overlayShawarmaChoice, () {});
     overlays.add(overlayShawarmaChoice, priority: 40);
@@ -994,27 +995,35 @@ class MuhtarGame extends FlameGame
       return;
     }
     activeShopNpcId = npc.npcId;
+    unawaited(audio.playShopMusic(npc.npcId));
     overlays.remove(overlayQuests);
     overlays.remove(overlayInventory);
     overlays.add(overlayUpgrade, priority: 10);
+  }
+
+  void restoreLocationMusic() {
+    unawaited(audio.playLocationMusic(gameState.currentLocationId));
   }
 
   void openInventory() {
     world_.player.stop();
     _pressedKeys.clear();
     _movementKeyOrder.clear();
+    restoreLocationMusic();
     overlays.remove(overlayUpgrade);
     overlays.remove(overlayQuests);
     overlays.add(overlayInventory, priority: 10);
   }
 
   void openQuests() {
+    restoreLocationMusic();
     overlays.remove(overlayUpgrade);
     overlays.remove(overlayInventory);
     overlays.add(overlayQuests, priority: 10);
   }
 
   void openSettings() {
+    restoreLocationMusic();
     overlays.remove(overlayUpgrade);
     overlays.remove(overlayInventory);
     overlays.remove(overlayQuests);
