@@ -20,6 +20,37 @@ enum GameSound {
   coins,
 }
 
+/// Фоновые композиции, подобранные для текущих локаций и режимов игры.
+enum MusicTrack {
+  station,
+  park,
+  bridge,
+  exploration,
+  shop,
+  college,
+  chill,
+  retro,
+  fight,
+  boss,
+  puzzle,
+}
+
+extension MusicTrackInfo on MusicTrack {
+  String get fileName => switch (this) {
+    MusicTrack.station => 'station_bg_music_1.wav',
+    MusicTrack.park => 'park_bg_music_1.wav',
+    MusicTrack.bridge => 'bridge_bg_music_1.wav',
+    MusicTrack.exploration => 'exploration_bg_music_1.wav',
+    MusicTrack.shop => 'shop_bg_music_1.wav',
+    MusicTrack.college => 'college_bg_music_1.wav',
+    MusicTrack.chill => 'chill_bg_music_1.wav',
+    MusicTrack.retro => 'retro_bg_music_1.wav',
+    MusicTrack.fight => 'fight_bg_music_1.wav',
+    MusicTrack.boss => 'boss_bg_music_1.wav',
+    MusicTrack.puzzle => 'puzzle_bg_music_1.wav',
+  };
+}
+
 /// Локальный кроссплатформенный слой коротких звуков.
 ///
 /// Файлы лежат в assets/audio/kenney и распространяются по CC0. Небольшой
@@ -27,10 +58,14 @@ enum GameSound {
 /// должен обрывать звук предыдущего символа.
 class AudioService extends ChangeNotifier {
   static const _assetRoot = 'audio/kenney/';
+  static const _musicAssetRoot = 'audio/music/';
 
   bool _enabled = true;
   final List<AudioPlayer> _players = [];
   int _nextPlayer = 0;
+  AudioPlayer? _musicPlayer;
+  MusicTrack? _currentMusic;
+  bool _musicPlaying = false;
   bool _disposed = false;
 
   bool get enabled => _enabled;
@@ -38,7 +73,58 @@ class AudioService extends ChangeNotifier {
   void setEnabled(bool value) {
     if (_enabled == value) return;
     _enabled = value;
+    if (!_enabled) {
+      _musicPlaying = false;
+      final player = _musicPlayer;
+      if (player != null) unawaited(player.pause());
+    } else {
+      final track = _currentMusic;
+      if (track != null) unawaited(playMusic(track));
+    }
     notifyListeners();
+  }
+
+  /// Включает зацикленную фоновую композицию, не перезапуская тот же трек.
+  Future<void> playMusic(MusicTrack track) async {
+    if (_disposed) return;
+    if (_currentMusic == track && _musicPlaying) return;
+    _currentMusic = track;
+    if (!_enabled) return;
+    final player = _musicPlayer ??= AudioPlayer();
+    try {
+      await player.setReleaseMode(ReleaseMode.loop);
+      await player.play(
+        AssetSource('$_musicAssetRoot${track.fileName}'),
+        volume: .24,
+      );
+      _musicPlaying = true;
+    } catch (error) {
+      _musicPlaying = false;
+      debugPrint('Не удалось воспроизвести музыку $track: $error');
+    }
+  }
+
+  Future<void> playLocationMusic(String locationId) => playMusic(
+    switch (locationId) {
+      'meadow' => MusicTrack.station,
+      'forest' => MusicTrack.park,
+      'ruins' => MusicTrack.bridge,
+      'horse' => MusicTrack.exploration,
+      'doner' || 'kopeechka' || 'cheburechnaya' => MusicTrack.shop,
+      'college' => MusicTrack.college,
+      'dormitory' => MusicTrack.chill,
+      'wb' => MusicTrack.retro,
+      _ => MusicTrack.exploration,
+    },
+  );
+
+  Future<void> playBattleMusic({bool boss = false}) =>
+      playMusic(boss ? MusicTrack.boss : MusicTrack.fight);
+
+  Future<void> pauseMusic() async {
+    _musicPlaying = false;
+    final player = _musicPlayer;
+    if (player != null) await player.pause();
   }
 
   Future<void> play(GameSound sound) async {
@@ -110,6 +196,9 @@ class AudioService extends ChangeNotifier {
       unawaited(player.dispose());
     }
     _players.clear();
+    final musicPlayer = _musicPlayer;
+    _musicPlayer = null;
+    if (musicPlayer != null) unawaited(musicPlayer.dispose());
     super.dispose();
   }
 }
