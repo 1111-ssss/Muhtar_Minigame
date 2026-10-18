@@ -459,7 +459,7 @@ class DiceModifierTargetDialog extends StatelessWidget {
             : ListView.separated(
                 shrinkWrap: true,
                 itemCount: targets.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
                 itemBuilder: (context, position) {
                   final index = targets[position];
                   final die = dice[index];
