@@ -3,6 +3,29 @@ import 'package:flutter/foundation.dart';
 /// Тип эффекта, который даёт слот экипировки при помещении в него кости.
 enum SlotEffect { damage, shield, heal, burn, poison, upgrade }
 
+extension SlotEffectInfo on SlotEffect {
+  String get title => switch (this) {
+    SlotEffect.damage => 'Урон',
+    SlotEffect.shield => 'Щит',
+    SlotEffect.heal => 'Лечение',
+    SlotEffect.burn => 'Горение',
+    SlotEffect.poison => 'Яд',
+    SlotEffect.upgrade => 'Улучшение',
+  };
+}
+
+/// Редкость способности, которая показывается в подсказке врага.
+enum AbilityRarity { common, rare, epic, legendary }
+
+extension AbilityRarityInfo on AbilityRarity {
+  String get title => switch (this) {
+    AbilityRarity.common => 'Обычная',
+    AbilityRarity.rare => 'Редкая',
+    AbilityRarity.epic => 'Эпическая',
+    AbilityRarity.legendary => 'Легендарная',
+  };
+}
+
 /// Слот экипировки: принимает кость по правилу [rule] и применяет эффект.
 ///
 /// Правила как в Dicey Dungeons: одни слоты берут любую кость, другие —
@@ -15,6 +38,8 @@ class EquipmentSlot {
     required this.effect,
     required this.rule,
     this.minValue = 0,
+    this.description = '',
+    this.rarity = AbilityRarity.common,
   });
 
   final String id;
@@ -24,6 +49,12 @@ class EquipmentSlot {
 
   /// Минимальное значение для правила minValue (и база для кратности multiplier).
   final int minValue;
+
+  /// Короткое описание способности для боевой подсказки.
+  final String description;
+
+  /// Редкость способности, определяющая оформление подсказки.
+  final AbilityRarity rarity;
 
   bool accepts(int value) => rule.accepts(value, minValue);
 

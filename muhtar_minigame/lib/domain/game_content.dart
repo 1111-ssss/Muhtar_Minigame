@@ -250,6 +250,7 @@ class GameContent {
         name: 'Удар',
         effect: SlotEffect.damage,
         rule: SlotRule.any,
+        description: 'Бросается вперёд и наносит урон герою.',
       ),
     ],
   );
@@ -270,12 +271,15 @@ class GameContent {
         name: 'Дубина',
         effect: SlotEffect.damage,
         rule: SlotRule.any,
+        description: 'Тяжёлый удар дубиной по герою.',
       ),
       EquipmentSlot(
         id: 'goblin_block',
         name: 'Прикрытие',
         effect: SlotEffect.shield,
         rule: SlotRule.even,
+        description: 'Поднимает щит, если на кости выпало чётное значение.',
+        rarity: AbilityRarity.rare,
       ),
     ],
   );
@@ -283,7 +287,7 @@ class GameContent {
   static const EnemyArchetype gopnik = EnemyArchetype(
     id: 'gopnik',
     name: 'Гопник',
-    maxHp: 20,
+    maxHp: 10,
     diceFaces: [1, 2, 2, 3, 3, 4],
     coins: 18,
     xp: 15,
@@ -295,6 +299,7 @@ class GameContent {
         name: 'Толчок',
         effect: SlotEffect.damage,
         rule: SlotRule.any,
+        description: 'Резко толкает героя и наносит один удар.',
       ),
     ],
   );
@@ -324,6 +329,7 @@ class GameContent {
         name: 'Шампур',
         effect: SlotEffect.damage,
         rule: SlotRule.any,
+        description: 'Прокалывает героя шампуром и наносит урон.',
       ),
       EquipmentSlot(
         id: 'shaurmek_sauce',
@@ -331,6 +337,8 @@ class GameContent {
         effect: SlotEffect.burn,
         rule: SlotRule.minValue,
         minValue: 4,
+        description: 'Ожог соусом накладывает горение при значении от 4.',
+        rarity: AbilityRarity.rare,
       ),
     ],
   );
@@ -343,6 +351,7 @@ class GameContent {
     coins: 30,
     xp: 26,
     startingShield: 3,
+    shieldChance: .35,
     rootCells: 4,
     attackPhrases: [
       'Я Виктор Корнеплод, меня так просто не выкопать!',
@@ -354,12 +363,15 @@ class GameContent {
         name: 'Корнеплодный удар',
         effect: SlotEffect.damage,
         rule: SlotRule.any,
+        description: 'Удар корнем, после которого Виктор атакует первым.',
       ),
       EquipmentSlot(
         id: 'viktor_bark',
         name: 'Корневая броня',
         effect: SlotEffect.shield,
         rule: SlotRule.even,
+        description: 'Покрывает Виктора корой и даёт щит на чётной кости.',
+        rarity: AbilityRarity.rare,
       ),
     ],
   );
@@ -385,6 +397,8 @@ class GameContent {
         name: 'Фанфик',
         effect: SlotEffect.damage,
         rule: SlotRule.any,
+        description: 'Запутывает героя в сюжете и наносит неожиданный урон.',
+        rarity: AbilityRarity.epic,
       ),
     ],
   );

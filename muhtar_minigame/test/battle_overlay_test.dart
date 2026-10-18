@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muhtar_minigame/domain/dice.dart';
+import 'package:muhtar_minigame/domain/equipment.dart';
 import 'package:muhtar_minigame/domain/game_content.dart';
 import 'package:muhtar_minigame/game/muhtar_game.dart';
 import 'package:muhtar_minigame/game/world/enemy_entity.dart';
@@ -58,6 +59,7 @@ void main() {
     int enemyAttack = 3,
     int enemyAttackHits = 1,
     List<Dice>? dice,
+    List<EquipmentSlot>? equipment,
     int playerDiceCount = 1,
   }) {
     final engine = BattleEngine(
@@ -75,6 +77,8 @@ void main() {
         attackHits: enemyAttackHits,
         attackPhrases: const ['Фраза врага один', 'Фраза врага два'],
         rootCells: rootCells,
+        equipment: equipment ?? const [],
+        appearance: 'gopnik',
       ),
       playerDiceCount: playerDiceCount,
       random: rootCells == 0 ? null : Random(4),
@@ -166,8 +170,34 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('2 x3'), findsNWidgets(2));
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('hero-panel')),
+        matching: find.byKey(const ValueKey('incoming')),
+      ),
+      findsNothing,
+    );
+    expect(find.text('2 x3'), findsOneWidget);
     expect(battle.previewFor(battle.player).incomingHits, 3);
+  });
+
+  testWidgets('способность врага открывает подсказку по нажатию', (
+    tester,
+  ) async {
+    buildBattle(equipment: GameContent.gopnik.equipment);
+    await pumpBattle(tester);
+
+    final badge = find.byKey(const ValueKey('enemy-ability-gopnik_push'));
+    expect(badge, findsOneWidget);
+    await tester.tap(badge);
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.textContaining('Толчок'), findsOneWidget);
+    expect(find.textContaining('Обычная'), findsOneWidget);
+    expect(
+      find.textContaining('Резко толкает героя и наносит один удар.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('недоступная после расхода энергии кость затемняет только себя', (
