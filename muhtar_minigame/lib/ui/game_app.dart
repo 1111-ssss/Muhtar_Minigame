@@ -31,6 +31,7 @@ import 'search/potato_pickup_overlay.dart';
 import 'transition/location_transition_overlay.dart';
 import 'upgrade/upgrade_overlay.dart';
 import 'settings/settings_overlay.dart';
+import 'main_menu.dart';
 
 /// Корневой виджет: связывает Flame-игру с Flutter-оверлеями.
 class GameApp extends StatefulWidget {
@@ -47,6 +48,9 @@ class _GameAppState extends State<GameApp> with WidgetsBindingObserver {
   MuhtarGame? _game;
   String? _loadError;
   String _loadStage = 'Подготавливаем игру…';
+  late String _saveDirectory;
+  bool _hasSave = false;
+  bool _showMainMenu = true;
 
   @override
   void initState() {
@@ -55,6 +59,7 @@ class _GameAppState extends State<GameApp> with WidgetsBindingObserver {
     _gameState = GameState();
     _notifications = NotificationService();
     _audio = AudioService();
+    unawaited(_audio.playMusic(MusicTrack.menu));
     _loadGame();
   }
 
@@ -70,7 +75,7 @@ class _GameAppState extends State<GameApp> with WidgetsBindingObserver {
       // searchable-пропы через реестр Locations. Параллельный запуск мог
       // разобрать сейв раньше editor overrides и потерять валидные результаты.
       await LocationAssets.load();
-      final saveDirectory = await _loadProgress();
+      _saveDirectory = await _loadProgress();
 
       if (mounted) {
         setState(() => _loadStage = 'Прогрев первой карты…');
@@ -83,7 +88,7 @@ class _GameAppState extends State<GameApp> with WidgetsBindingObserver {
           gameState: _gameState,
           notifications: _notifications,
           audio: _audio,
-          saveDirectory: saveDirectory,
+          saveDirectory: _saveDirectory,
         );
       });
     } on Object catch (error) {
@@ -97,12 +102,52 @@ class _GameAppState extends State<GameApp> with WidgetsBindingObserver {
 
     // До введения постоянного каталога сохранения были относительными. Один
     // раз переносим такой сейв, чтобы уже сыгранный прогресс не потерялся.
-    final loaded = await _gameState.load(saveDirectory);
+    var loaded = await _gameState.load(saveDirectory);
     if (!loaded) {
       final migrated = await _gameState.load('save');
       if (migrated) await _gameState.save(saveDirectory);
+      loaded = migrated;
     }
+    _hasSave = loaded;
     return saveDirectory;
+  }
+
+  Future<void> _startGame() async {
+    if (!mounted) return;
+    setState(() => _showMainMenu = false);
+    unawaited(_audio.playLocationMusic(_gameState.currentLocationId));
+  }
+
+  Future<void> _startNewGame() async {
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Начать новую игру?'),
+        content: const Text(
+          'Текущий прогресс будет удалён. Это действие нельзя отменить.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Удалить прогресс'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await _gameState.clearSave(_saveDirectory);
+    _gameState.reset();
+    await _gameState.save(_saveDirectory);
+    _hasSave = false;
+    if (!mounted) return;
+    setState(() => _showMainMenu = false);
+    unawaited(_audio.playLocationMusic('meadow'));
   }
 
   Future<void> _precacheInitialLocations() async {
@@ -173,6 +218,13 @@ class _GameAppState extends State<GameApp> with WidgetsBindingObserver {
             )
           : _game == null
           ? _LoadingSplash(stage: _loadStage)
+          : _showMainMenu
+          ? MainMenu(
+              gameState: _gameState,
+              hasSave: _hasSave,
+              onStart: _startGame,
+              onNewGame: _startNewGame,
+            )
           : GameView(game: _game!),
     );
   }
