@@ -13,6 +13,10 @@
 muhtar_minigame/save/
 muhtar_minigame/muhtar_build/backups/
 
+# Local source archives for selected media
+Music.zip
+muhtar_minigame/Music/
+
 # IDE and OS files
 .idea/
 .vscode/
