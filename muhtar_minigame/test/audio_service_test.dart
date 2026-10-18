@@ -7,12 +7,17 @@ void main() {
       musicTrackForLocation('doner'),
       musicTrackForLocation('kopeechka'),
       musicTrackForLocation('cheburechnaya'),
+      musicTrackForShop('ariana'),
     ];
 
-    expect(tracks.toSet(), hasLength(3));
+    expect(tracks.toSet(), hasLength(4));
     expect(tracks[0].fileName, 'shop_bg_music_1.wav');
     expect(tracks[1].fileName, 'shop_bg_music_2.wav');
     expect(tracks[2].fileName, 'shop_bg_music_3.wav');
+    expect(tracks[3].fileName, 'shop_bg_music_4.wav');
+    expect(musicTrackForShop('baba_galya'), MusicTrack.cheburechnayaShop);
+    expect(musicTrackForShop('alenka'), MusicTrack.kopeechkaShop);
+    expect(musicTrackForShop('shaurmek'), MusicTrack.donerShop);
   });
 
   test('main menu has a dedicated track', () {
