@@ -56,6 +56,7 @@ void main() {
   BattleEngine buildBattle({
     int rootCells = 0,
     int enemyAttack = 3,
+    int enemyAttackHits = 1,
     List<Dice>? dice,
     int playerDiceCount = 1,
   }) {
@@ -71,6 +72,7 @@ void main() {
         name: 'Гопник',
         maxHp: 30,
         attackFaces: [enemyAttack],
+        attackHits: enemyAttackHits,
         attackPhrases: const ['Фраза врага один', 'Фраза врага два'],
         rootCells: rootCells,
       ),
@@ -143,6 +145,31 @@ void main() {
     expect(battle.round, 2, reason: 'ход должен разыграться до конца');
   });
 
+  testWidgets('атака игрока показывается над врагом, не над игроком', (
+    tester,
+  ) async {
+    final battle = buildBattle(enemyAttack: 2, enemyAttackHits: 3);
+    await pumpBattle(tester);
+
+    expect(find.byKey(const ValueKey('attack')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('hero-panel')),
+        matching: find.byKey(const ValueKey('attack')),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('enemy-panel')),
+        matching: find.byKey(const ValueKey('attack')),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('2 x3'), findsNWidgets(2));
+    expect(battle.previewFor(battle.player).incomingHits, 3);
+  });
+
   testWidgets('недоступная после расхода энергии кость затемняет только себя', (
     tester,
   ) async {
@@ -206,6 +233,7 @@ void main() {
     await tester.pump(const Duration(seconds: 4));
     expect(battle.isOver, isTrue);
     expect(find.text('Победа!'), findsOneWidget);
+    expect(find.byIcon(Icons.close), findsOneWidget);
 
     // Как в игре: Flame доставляет клавиши через onKeyEvent у самой игры,
     // а бой в этот момент блокирует ввод (оверлей активен).
@@ -233,23 +261,17 @@ void main() {
     final battle = buildBattle(rootCells: 3, enemyAttack: 0);
     await pumpBattle(tester);
 
+    expect(battle.rootedCells, isEmpty);
+    battle.prepareEndTurn();
+    await tester.pump();
     final firstRoundRoots = Set<int>.of(battle.rootedCells);
     expect(find.byKey(const ValueKey('rooted-legend')), findsOneWidget);
     expect(find.byIcon(Icons.lock_outline), findsNWidgets(4));
     expect(find.text('КОРНИ'), findsNWidgets(firstRoundRoots.length));
 
-    var releasedCell = -1;
-    for (var round = 0; round < 10; round++) {
-      battle.endTurn();
-      await tester.pump();
-      for (final cell in firstRoundRoots) {
-        if (!battle.isCellRooted(cell)) {
-          releasedCell = cell;
-          break;
-        }
-      }
-      if (releasedCell >= 0) break;
-    }
+    battle.endTurn();
+    await tester.pump();
+    final releasedCell = firstRoundRoots.first;
 
     expect(releasedCell, greaterThanOrEqualTo(0));
     final releasedCellFinder = find.byKey(ValueKey('board-cell-$releasedCell'));
@@ -264,7 +286,26 @@ void main() {
       ),
       findsNothing,
     );
-    expect(find.text('КОРНИ'), findsNWidgets(battle.rootedCells.length));
+    expect(find.text('КОРНИ'), findsNothing);
+  });
+
+  testWidgets('корни появляются на end round и отменяют занятую клетку', (
+    tester,
+  ) async {
+    final battle = buildBattle(rootCells: 9, enemyAttack: 0);
+    await pumpBattle(tester);
+    expect(battle.placeDie(0, 4), isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('end-turn')));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(battle.rootedCells, hasLength(9));
+    expect(battle.cancelledCells, contains(4));
+    expect(find.byKey(const ValueKey('cancelled-die-4')), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(battle.round, 2);
+    expect(battle.lastEnemyDamage, 0);
   });
 
   testWidgets(

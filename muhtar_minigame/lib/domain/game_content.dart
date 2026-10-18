@@ -343,7 +343,7 @@ class GameContent {
     coins: 30,
     xp: 26,
     startingShield: 3,
-    rootCells: 5,
+    rootCells: 4,
     attackPhrases: [
       'Я Виктор Корнеплод, меня так просто не выкопать!',
       'Корни крепкие, а удар будет ещё крепче!',

@@ -771,6 +771,7 @@ class MuhtarGame extends FlameGame
       dice: [],
       attackFaces: archetype.diceFaces,
       baseAttack: archetype.diceFaces.isEmpty ? 0 : archetype.diceFaces.first,
+      attackHits: archetype.attackHits,
       baseShield: archetype.startingShield,
       baseHealing: archetype.healingAmount,
       healingChance: archetype.healingChance,
@@ -816,7 +817,6 @@ class MuhtarGame extends FlameGame
       }
 
       if (engine.player.isDead) {
-        unawaited(audio.play(GameSound.defeat));
         final archetype = enemyEntity == null
             ? null
             : GameContent.enemyById(enemyEntity.enemyId);
@@ -833,7 +833,6 @@ class MuhtarGame extends FlameGame
         gameState.currentLocationId = 'meadow';
         unawaited(_respawnAtMeadow());
       } else if (engine.enemy.isDead && enemyEntity != null) {
-        unawaited(audio.play(GameSound.victory));
         final archetype = GameContent.enemyById(enemyEntity.enemyId);
         if (archetype != null) {
           gameState.addCoins(archetype.coins);

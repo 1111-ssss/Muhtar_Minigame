@@ -467,6 +467,33 @@ void main() {
     expect(preview.blockedDamage, 0);
   });
 
+  test('многоударная атака сохраняет урон за удар и количество попаданий', () {
+    final battle = BattleEngine(
+      player: player(),
+      enemy: Fighter(
+        name: 'Враг',
+        maxHp: 30,
+        attackFaces: const [2],
+        attackHits: 3,
+      ),
+    )..startTurn();
+
+    final preview = battle.previewFor(battle.player);
+    expect(preview.incomingDamage, 6);
+    expect(preview.incomingDamagePerHit, 2);
+    expect(preview.incomingHits, 3);
+
+    battle.endTurn();
+    final attack = battle.lastEvents.firstWhere(
+      (event) =>
+          event.source == BattleSide.enemy &&
+          event.type == BattleEventType.attack,
+    );
+    expect(attack.amount, 2);
+    expect(attack.hits, 3);
+    expect(battle.player.hp, 24);
+  });
+
   test(
     'кость doctor использует текущее выпавшее значение, а preview совпадает с фактом',
     () {
@@ -567,7 +594,7 @@ void main() {
     expect(battle.player.burn, 3);
   });
 
-  test('корни Виктора блокируют пять случайных клеток на раунд', () {
+  test('корни Виктора выбирают клетки после завершения расстановки', () {
     final battle = BattleEngine(
       player: player(),
       enemy: Fighter(
@@ -579,11 +606,33 @@ void main() {
       random: Random(4),
     )..startTurn();
 
+    expect(battle.rootedCells, isEmpty);
+    battle.prepareEndTurn();
     expect(battle.rootedCells, hasLength(5));
     expect(battle.rootedCells, everyElement(inInclusiveRange(0, 8)));
     for (final cell in battle.rootedCells) {
       expect(battle.placeDie(0, cell), isFalse);
     }
+  });
+
+  test('занятая корнями клетка отменяет кость до разрешения раунда', () {
+    final battle = BattleEngine(
+      player: player(),
+      enemy: Fighter(
+        name: 'Виктор Корнеплод',
+        maxHp: 30,
+        attackFaces: const [1],
+        rootCells: 9,
+      ),
+    )..startTurn();
+
+    expect(battle.placeDie(0, 4), isTrue);
+    battle.prepareEndTurn();
+
+    expect(battle.isCellCancelled(4), isTrue);
+    expect(battle.playerIntent.attack, 0);
+    expect(battle.endTurn(), isFalse);
+    expect(battle.lastEnemyDamage, 0);
   });
 
   test('освободившаяся клетка снова доступна в следующем раунде', () {
@@ -597,22 +646,24 @@ void main() {
       ),
       random: Random(4),
     )..startTurn();
-    final firstRoundRoots = battle.rootedCells;
-    var releasedCell = -1;
+    expect(battle.rootedCells, isEmpty);
+    final firstRoundRoots = battle.prepareEndTurn();
+    expect(firstRoundRoots, hasLength(1));
+    battle.endTurn();
+    expect(battle.rootedCells, isEmpty);
 
-    for (var round = 0; round < 10; round++) {
-      battle.endTurn();
-      for (final cell in firstRoundRoots) {
-        if (!battle.isCellRooted(cell)) {
-          releasedCell = cell;
-          break;
-        }
+    var releasedCell = -1;
+    for (final cell in firstRoundRoots) {
+      if (!battle.isCellRooted(cell)) {
+        releasedCell = cell;
+        break;
       }
-      if (releasedCell >= 0) break;
     }
 
     expect(releasedCell, greaterThanOrEqualTo(0));
     expect(battle.isCellRooted(releasedCell), isFalse);
+    battle.prepareEndTurn();
+    expect(battle.rootedCells, hasLength(1));
   });
 
   test('железная нить не теряется в отображаемой сумме щита', () {

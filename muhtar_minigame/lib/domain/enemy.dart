@@ -17,6 +17,7 @@ class EnemyArchetype {
     this.xp = 8,
     this.actsFirst = false,
     this.appliesBurn = false,
+    this.attackHits = 1,
     this.burnDamage = 0,
     this.startingShield = 0,
     this.attackPhrases = const [],
@@ -45,6 +46,7 @@ class EnemyArchetype {
 
   /// Особенности архетипа, которые читаются боевым движком.
   final bool actsFirst;
+  final int attackHits;
   final bool appliesBurn;
   final int burnDamage;
   final int startingShield;
