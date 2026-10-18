@@ -727,108 +727,107 @@ class _BattleOverlayState extends State<BattleOverlay> {
           ),
         ),
       ),
-       DragTarget<_DieDrag>(
-         onWillAcceptWithDetails: (details) =>
-             _acceptHotbarDrop(details.data),
-         onAcceptWithDetails: (details) => _removeDraggedDie(details.data),
-         builder: (context, candidates, rejected) => Container(
-           key: const ValueKey('battle-hotbar'),
-           height: 116,
-           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-           decoration: BoxDecoration(
-             color: const Color(0xFF222331),
-             borderRadius: BorderRadius.circular(14),
-             border: Border.all(
-               color: candidates.isNotEmpty
-                   ? const Color(0xFF87FFE1)
-                   : const Color(0xFF8D7855),
-               width: 2,
-             ),
-           ),
-           child: LayoutBuilder(
-             builder: (context, constraints) {
-            const rerollWidth = 90.0;
-            const gap = 12.0;
-            final diceZoneWidth = (constraints.maxWidth - rerollWidth - gap)
-                .clamp(0.0, double.infinity)
-                .toDouble();
-            final visibleIndexes = [
-              for (var index = 0; index < _battle.hotbarSize; index++)
-                if (_battle.hotbar[index] != null) index,
-            ];
-            return Stack(
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: SizedBox(
-                    width: diceZoneWidth,
-                    height: 96,
-                    child: Center(
-                      child: FittedBox(
-                        fit: BoxFit.contain,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            for (final index in visibleIndexes)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 2,
-                                ),
-                                child: _hotbarSlot(index, scale),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: SizedBox(
-                    width: rerollWidth,
-                    height: 82,
-                    child: Tooltip(
-                      message:
-                          'Заменить выбранную кость. Осталось ${_battle.rerollsRemaining}',
-                      child: ExcludeFocus(
-                        child: OutlinedButton(
-                          key: const ValueKey('reroll'),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(rerollWidth, 82),
-                            padding: EdgeInsets.zero,
-                          ),
-                          onPressed:
-                              _selectedHotbar != null &&
-                                  _battle.canAct &&
-                                  _battle.rerollsRemaining > 0
-                              ? () {
-                                  if (_battle.rerollDie(_selectedHotbar!)) {
-                                    widget.game.audio.play(GameSound.dieReroll);
-                                  }
-                                }
-                              : null,
-                          child: Column(
+      DragTarget<_DieDrag>(
+        onWillAcceptWithDetails: (details) => _acceptHotbarDrop(details.data),
+        onAcceptWithDetails: (details) => _removeDraggedDie(details.data),
+        builder: (context, candidates, rejected) => Container(
+          key: const ValueKey('battle-hotbar'),
+          height: 116,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF222331),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: candidates.isNotEmpty
+                  ? const Color(0xFF87FFE1)
+                  : const Color(0xFF8D7855),
+              width: 2,
+            ),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              const rerollWidth = 90.0;
+              const gap = 12.0;
+              final diceZoneWidth = (constraints.maxWidth - rerollWidth - gap)
+                  .clamp(0.0, double.infinity)
+                  .toDouble();
+              final visibleIndexes = [
+                for (var index = 0; index < _battle.hotbarSize; index++)
+                  if (_battle.hotbar[index] != null) index,
+              ];
+              return Stack(
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      width: diceZoneWidth,
+                      height: 96,
+                      child: Center(
+                        child: FittedBox(
+                          fit: BoxFit.contain,
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const GameIcon(GameSymbol.reroll, size: 28),
-                              const SizedBox(height: 6),
-                              Text(
-                                '${_battle.rerollsRemaining}',
-                                style: const TextStyle(fontSize: 20),
-                              ),
+                              for (final index in visibleIndexes)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 2,
+                                  ),
+                                  child: _hotbarSlot(index, scale),
+                                ),
                             ],
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            );
-             },
-           ),
-         ),
-       ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: SizedBox(
+                      width: rerollWidth,
+                      height: 82,
+                      child: Tooltip(
+                        message:
+                            'Заменить выбранную кость. Осталось ${_battle.rerollsRemaining}',
+                        child: ExcludeFocus(
+                          child: OutlinedButton(
+                            key: const ValueKey('reroll'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(rerollWidth, 82),
+                              padding: EdgeInsets.zero,
+                            ),
+                            onPressed:
+                                _selectedHotbar != null &&
+                                    _battle.canAct &&
+                                    _battle.rerollsRemaining > 0
+                                ? () {
+                                    if (_battle.rerollDie(_selectedHotbar!)) {
+                                      widget.game.audio.play(GameSound.dieReroll);
+                                    }
+                                  }
+                                : null,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const GameIcon(GameSymbol.reroll, size: 28),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '${_battle.rerollsRemaining}',
+                                  style: const TextStyle(fontSize: 20),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
     ],
   );
 
