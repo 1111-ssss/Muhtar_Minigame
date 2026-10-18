@@ -60,6 +60,7 @@ class MuhtarGame extends FlameGame
   bool _endingBattle = false;
   NpcEntity? _talkingNpc;
   LocationProp? _searchingProp;
+  LocationProp? _potatoPickupProp;
   String? _donerQuestId;
   String? _donerRecipeId;
   String? activeShopNpcId;
@@ -77,7 +78,6 @@ class MuhtarGame extends FlameGame
   final Set<LogicalKeyboardKey> _pressedKeys = {};
   final List<LogicalKeyboardKey> _movementKeyOrder = [];
   double _heldMoveTimer = 0;
-  bool _heldRepeatStarted = false;
 
   /// Автосохранение: любое изменение состояния (взятие квеста, монеты, HP)
   /// уходит на диск не позже секунды спустя, чтобы закрытие окна не теряло
@@ -86,11 +86,8 @@ class MuhtarGame extends FlameGame
   async.Timer? _tripTimer;
   static const _autosaveDelay = Duration(seconds: 1);
 
-  /// Пауза после первого шага перед автоповтором. Она длиннее анимации одного
-  /// тайла, поэтому короткое нажатие не превращается в два шага.
-  static const _heldMoveDelay = 0.24;
-
-  /// Интервал последующих шагов при настоящем удержании клавиши.
+  /// Интервал шагов при удержании клавиши. Первый шаг выполняется сразу в
+  /// [_beginMovementIntent], поэтому отдельной паузы перед повтором нет.
   static const _heldMoveRepeat = 0.13;
 
   static const overlayHud = 'hud';
@@ -98,6 +95,7 @@ class MuhtarGame extends FlameGame
   static const overlayBattleConfirm = 'battle_confirm';
   static const overlayPreBattle = 'pre_battle';
   static const overlaySearch = 'search';
+  static const overlayPotatoPickup = 'potato_pickup';
   static const overlaySongMiniGame = 'song_minigame';
   static const overlayDonerAssembly = 'doner_assembly';
   static const overlayVideoSequence = 'video_sequence';
@@ -123,6 +121,7 @@ class MuhtarGame extends FlameGame
     // камерой, коллизиями и первой отрисовкой карты.
     await add(world_);
     camera.follow(world_.player, snap: true);
+    unawaited(audio.playLocationMusic(gameState.currentLocationId));
 
     overlays.add(overlayHud);
     overlays.add('notifications', priority: 20);
@@ -155,18 +154,13 @@ class MuhtarGame extends FlameGame
     final direction = _directionFromPressedKeys();
     if (direction == null) {
       _heldMoveTimer = 0;
-      _heldRepeatStarted = false;
       return;
     }
 
-    // Первый шаг происходит на KeyDown. Здесь запускаются только повторные
-    // шаги, после отдельной задержки удержания.
+    // Первый шаг происходит на KeyDown. Удержание сразу переходит в обычный
+    // интервал повторения, без дополнительной задержки после первого шага.
     _heldMoveTimer += dt;
-    if (!_heldRepeatStarted && _heldMoveTimer >= _heldMoveDelay) {
-      _heldMoveTimer = 0;
-      _heldRepeatStarted = true;
-      world_.movePlayerBy(direction.$1, direction.$2);
-    } else if (_heldRepeatStarted && _heldMoveTimer >= _heldMoveRepeat) {
+    if (_heldMoveTimer >= _heldMoveRepeat) {
       _heldMoveTimer -= _heldMoveRepeat;
       world_.movePlayerBy(direction.$1, direction.$2);
     }
@@ -317,6 +311,7 @@ class MuhtarGame extends FlameGame
       overlayBattleConfirm,
       overlayPreBattle,
       overlaySearch,
+      overlayPotatoPickup,
       overlaySongMiniGame,
       overlayDonerAssembly,
       overlayVideoSequence,
@@ -424,6 +419,7 @@ class MuhtarGame extends FlameGame
         fromLocationId: sourceId,
       );
       camera.follow(world_.player, snap: true);
+      unawaited(audio.playLocationMusic(destination.id));
       await saveProgress();
       notifications.notify(
         'Локация: ${destination.name}',
@@ -517,7 +513,14 @@ class MuhtarGame extends FlameGame
   LocationProp? get searchingProp => _searchingProp;
 
   void _startPropSearch(LocationProp prop) {
-    if (_endingBattle || battle != null || overlays.isActive(overlaySearch)) {
+    if (_endingBattle ||
+        battle != null ||
+        overlays.isActive(overlaySearch) ||
+        overlays.isActive(overlayPotatoPickup)) {
+      return;
+    }
+    if (prop.specialItemId == 'potato') {
+      openPotatoPickup(prop);
       return;
     }
     if (prop.kind == LocationPropKind.bush &&
@@ -534,6 +537,44 @@ class MuhtarGame extends FlameGame
     _movementKeyOrder.clear();
     registerWindowCloseHandler(overlaySearch, closeSearch);
     overlays.add(overlaySearch, priority: 10);
+  }
+
+  LocationProp? get potatoPickupProp => _potatoPickupProp;
+
+  void openPotatoPickup(LocationProp prop) {
+    if (_endingBattle ||
+        battle != null ||
+        overlays.isActive(overlayPotatoPickup) ||
+        !gameState.isPropVisible(prop)) {
+      return;
+    }
+    _potatoPickupProp = prop;
+    world_.player.stop();
+    _pressedKeys.clear();
+    _movementKeyOrder.clear();
+    registerWindowCloseHandler(overlayPotatoPickup, closePotatoPickup);
+    overlays.add(overlayPotatoPickup, priority: 30);
+  }
+
+  void closePotatoPickup() {
+    _potatoPickupProp = null;
+    unregisterWindowCloseHandler(overlayPotatoPickup);
+    overlays.remove(overlayPotatoPickup);
+  }
+
+  bool pickUpPotato() {
+    final prop = _potatoPickupProp;
+    if (prop == null) return false;
+    final result = gameState.pickUpSpecialItem(prop.id);
+    if (!result.completed) return false;
+    unawaited(audio.play(GameSound.coins));
+    closePotatoPickup();
+    notifications.notify(
+      'Картошка подобрана. Отнеси её сотруднику ПВЗ на ВБ.',
+      type: NotificationType.reward,
+    );
+    unawaited(saveProgress());
+    return true;
   }
 
   void _interactWithProp(LocationProp prop) {
@@ -628,6 +669,7 @@ class MuhtarGame extends FlameGame
     world_.player.stop();
     _pressedKeys.clear();
     _movementKeyOrder.clear();
+    unawaited(audio.playMusic(MusicTrack.puzzle));
     registerWindowCloseHandler(overlaySongMiniGame, closeSongMiniGame);
     overlays.add(overlaySongMiniGame, priority: 20);
   }
@@ -635,6 +677,7 @@ class MuhtarGame extends FlameGame
   void closeSongMiniGame() {
     unregisterWindowCloseHandler(overlaySongMiniGame);
     overlays.remove(overlaySongMiniGame);
+    unawaited(audio.playLocationMusic(gameState.currentLocationId));
   }
 
   void completeSongMiniGame() {
@@ -661,6 +704,7 @@ class MuhtarGame extends FlameGame
     world_.player.stop();
     _pressedKeys.clear();
     _movementKeyOrder.clear();
+    unawaited(audio.playMusic(MusicTrack.puzzle));
     registerWindowCloseHandler(overlayDonerAssembly, closeDonerAssembly);
     overlays.add(overlayDonerAssembly, priority: 20);
   }
@@ -670,6 +714,7 @@ class MuhtarGame extends FlameGame
     _donerRecipeId = null;
     unregisterWindowCloseHandler(overlayDonerAssembly);
     overlays.remove(overlayDonerAssembly);
+    unawaited(audio.playLocationMusic(gameState.currentLocationId));
   }
 
   void completeDonerAssembly() {
@@ -699,6 +744,7 @@ class MuhtarGame extends FlameGame
     world_.player.stop();
     _pressedKeys.clear();
     _movementKeyOrder.clear();
+    unawaited(audio.pauseMusic());
     registerWindowCloseHandler(overlayVideoSequence, closeVideoSequence);
     overlays.add(overlayVideoSequence, priority: 30);
   }
@@ -706,6 +752,7 @@ class MuhtarGame extends FlameGame
   void closeVideoSequence() {
     unregisterWindowCloseHandler(overlayVideoSequence);
     overlays.remove(overlayVideoSequence);
+    unawaited(audio.playLocationMusic(gameState.currentLocationId));
   }
 
   void completeVideoSequence() {
@@ -750,6 +797,9 @@ class MuhtarGame extends FlameGame
     final archetype = GameContent.enemyById(enemyEntity.enemyId);
     if (archetype == null) return;
     unawaited(audio.play(GameSound.battleStart));
+    unawaited(
+      audio.playBattleMusic(boss: enemyEntity.enemyId == 'viktor_korneplod'),
+    );
 
     _battleEnemy = enemyEntity;
     _pressedKeys.clear();
@@ -773,6 +823,7 @@ class MuhtarGame extends FlameGame
       baseAttack: archetype.diceFaces.isEmpty ? 0 : archetype.diceFaces.first,
       attackHits: archetype.attackHits,
       baseShield: archetype.startingShield,
+      shieldChance: archetype.shieldChance,
       baseHealing: archetype.healingAmount,
       healingChance: archetype.healingChance,
       hideStats: archetype.hideStats,
@@ -780,6 +831,7 @@ class MuhtarGame extends FlameGame
       burnDamage: archetype.appliesBurn ? archetype.burnDamage : 0,
       appearance: enemyEntity.enemyId,
       attackPhrases: archetype.attackPhrases,
+      equipment: archetype.equipment,
       rootCells: archetype.rootCells,
     );
 
@@ -859,6 +911,7 @@ class MuhtarGame extends FlameGame
       _battleEnemy = null;
       overlays.remove(overlayBattle);
       _endingBattle = false;
+      unawaited(audio.playLocationMusic(gameState.currentLocationId));
     }
   }
 
@@ -874,6 +927,7 @@ class MuhtarGame extends FlameGame
     final remainingHp = engine.player.hp;
     if (!engine.surrender()) return;
     unawaited(audio.play(GameSound.defeat));
+    unawaited(audio.playLocationMusic(gameState.currentLocationId));
     // Отступление не является смертью: сохраняем именно тот HP, который
     // остался в бою, чтобы он был виден на карте и в следующем бою.
     gameState.setPlayerHp(remainingHp);
@@ -971,6 +1025,7 @@ class MuhtarGame extends FlameGame
     overlays.remove(overlaySettings);
     _clearBattleIntroOverlays();
     closeSearch();
+    closePotatoPickup();
     closeSongMiniGame();
     closeDonerAssembly();
     closeVideoSequence();
@@ -988,6 +1043,7 @@ class MuhtarGame extends FlameGame
     await gameState.clearSave(saveDirectory);
     await world_.loadLocation('meadow', spawnOverride: Locations.meadow.spawn);
     camera.follow(world_.player, snap: true);
+    unawaited(audio.playLocationMusic('meadow'));
     _pressedKeys.clear();
     _movementKeyOrder.clear();
   }
@@ -1006,6 +1062,7 @@ class MuhtarGame extends FlameGame
       overlays.isActive(overlayBattle) ||
       overlays.isActive(overlayDialog) ||
       overlays.isActive(overlaySearch) ||
+      overlays.isActive(overlayPotatoPickup) ||
       overlays.isActive(overlaySongMiniGame) ||
       overlays.isActive(overlayDonerAssembly) ||
       overlays.isActive(overlayVideoSequence) ||
@@ -1029,7 +1086,6 @@ class MuhtarGame extends FlameGame
 
   void _beginMovementIntent((int, int) direction) {
     _heldMoveTimer = 0;
-    _heldRepeatStarted = false;
     world_.movePlayerBy(direction.$1, direction.$2);
   }
 
