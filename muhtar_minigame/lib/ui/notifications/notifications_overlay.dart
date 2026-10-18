@@ -112,7 +112,7 @@ class _ToastTransition extends StatelessWidget {
     final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
     return SizeTransition(
       sizeFactor: curved,
-      axisAlignment: -1,
+      alignment: const Alignment(0, -1),
       child: SlideTransition(
         position: Tween<Offset>(
           begin: const Offset(0, .18),

@@ -641,6 +641,42 @@ class GameState extends ChangeNotifier {
     return result;
   }
 
+  /// Подбирает особый предмет, который лежит прямо на карте.
+  ///
+  /// Картошка на Мосту не требует десяти шагов поиска: осмотр заканчивается
+  /// отдельным диалогом, а эта операция выполняется только после подтверждения
+  /// игрока. Результат намеренно использует тот же формат, что и обычный поиск,
+  /// чтобы старые сохранения и правило одноразовой находки продолжали работать.
+  SearchResult pickUpSpecialItem(String propId) {
+    final prop = Locations.propById(propId);
+    final previous = _searchResults[propId];
+    if (previous != null && previous.completed) return previous;
+    if (prop == null || !prop.searchable || prop.specialItemId == null) {
+      return SearchResult(
+        propId: propId,
+        taps: searchTapCount(propId),
+        completed: false,
+        accepted: false,
+      );
+    }
+
+    final itemId = prop.specialItemId!;
+    _searchTaps[propId] = SearchResult.requiredTaps;
+    _items[itemId] = itemCount(itemId) + 1;
+    progressQuests(itemId: itemId, notify: false);
+    final result = SearchResult(
+      propId: prop.id,
+      taps: SearchResult.requiredTaps,
+      completed: true,
+      rewardType: SearchRewardType.item,
+      amount: 1,
+      itemId: itemId,
+    );
+    _searchResults[propId] = result;
+    notifyListeners();
+    return result;
+  }
+
   SearchResult _completeSearch(LocationProp prop) {
     final syncQuest = _quests['q_sync_async'];
     final hasSyncAsyncQuest =

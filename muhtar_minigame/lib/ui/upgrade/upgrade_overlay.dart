@@ -97,6 +97,7 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
     final modifier = state.rollModifier();
     if (modifier == null) return;
     await widget.game.saveProgress();
+    if (!mounted) return;
     if (showRoll) {
       await showDialog<void>(
         context: context,
@@ -234,47 +235,6 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
       listenable: widget.game.gameState,
       builder: (context, _) {
         final state = widget.game.gameState;
-        if (widget.shop) {
-          return Scaffold(
-            backgroundColor: const Color(0xFF141720),
-            appBar: AppBar(
-              backgroundColor: const Color(0xFF202332),
-              title: Text(
-                switch (widget.shopNpcId) {
-                  'baba_galya' => 'Магазин Бабы Гали',
-                  'alenka' => 'Копеечка · магазин',
-                  'shaurmek' => 'Донер · магазин Шаурмека',
-                  _ => 'Магазин Арианы',
-                },
-              ),
-              leading: IconButton(
-                tooltip: 'Закрыть',
-                onPressed: close,
-                icon: const Icon(Icons.close),
-              ),
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Center(child: Text('${state.coins} монет')),
-                ),
-              ],
-            ),
-            body: SafeArea(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-                children: [
-                  _Section('Товары'),
-                  _ShopGrid(
-                    state: state,
-                    npcId: widget.shopNpcId ?? 'ariana',
-                    onPurchase: _purchase,
-                    onUpgrade: _purchaseUpgrade,
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
         final visibleDice = _visibleDice(state);
         return Scaffold(
           backgroundColor: const Color(0xFF141720),

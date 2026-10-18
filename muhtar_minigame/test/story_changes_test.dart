@@ -10,6 +10,7 @@ import 'package:muhtar_minigame/game_logic/audio_service.dart';
 import 'package:muhtar_minigame/game_logic/game_state.dart';
 import 'package:muhtar_minigame/game_logic/notification_service.dart';
 import 'package:muhtar_minigame/ui/battle/pre_battle_overlay.dart';
+import 'package:muhtar_minigame/ui/search/potato_pickup_overlay.dart';
 import 'package:muhtar_minigame/ui/search/search_overlay.dart';
 
 class _FixedRandom implements Random {
@@ -38,6 +39,7 @@ void main() {
       MuhtarGame.overlayBattleConfirm,
       MuhtarGame.overlayPreBattle,
       MuhtarGame.overlaySearch,
+      MuhtarGame.overlayPotatoPickup,
       MuhtarGame.overlayVideoSequence,
       MuhtarGame.overlayDialog,
       'notifications',
@@ -189,6 +191,41 @@ void main() {
 
     expect(find.bySemanticsLabel('Осмотреть картошку'), findsOneWidget);
     expect(find.bySemanticsLabel('Осмотреть куст'), findsNothing);
+  });
+
+  test('тап по картошке открывает диалог подбора, а не обычный поиск', () {
+    final prop = Locations.ruins.props.singleWhere(
+      (candidate) => candidate.specialItemId == 'potato',
+    );
+
+    game.world_.onPropSearch!(prop);
+
+    expect(game.overlays.isActive(MuhtarGame.overlayPotatoPickup), isTrue);
+    expect(game.overlays.isActive(MuhtarGame.overlaySearch), isFalse);
+    expect(game.potatoPickupProp, same(prop));
+  });
+
+  testWidgets('диалог картошки подбирает предмет одним подтверждением', (
+    tester,
+  ) async {
+    var picked = false;
+    var closed = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PotatoPickupOverlay(
+          onPickUp: () => picked = true,
+          onClose: () => closed = true,
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('potato-pickup-dialog')), findsOneWidget);
+    expect(find.text('Картошка'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('potato-pickup')));
+    await tester.tap(find.byKey(const ValueKey('potato-pickup-cancel')));
+
+    expect(picked, isTrue);
+    expect(closed, isTrue);
   });
 
   test('интерактивная раздевалка ВБ принимает и продолжает квест', () {

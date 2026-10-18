@@ -47,6 +47,7 @@ void main() {
     expect(GameContent.enemyById('gopnik')?.name, 'Гопник');
     expect(GameContent.enemyById('shaurmek')?.name, 'Шаурмек');
     expect(GameContent.enemyById('viktor_korneplod')?.name, 'Виктор Корнеплод');
+    expect(GameContent.enemyById('viktor_korneplod')?.shieldChance, .35);
     final sofia = GameContent.enemyById('sofia');
     expect(sofia?.hideStats, isTrue);
     expect(sofia?.healingAmount, 5);
@@ -250,7 +251,7 @@ void main() {
     final gopnik = GameContent.enemyById('gopnik')!;
     expect(gopnik.appliesBurn, isFalse);
     expect(gopnik.burnDamage, 0);
-    expect(gopnik.maxHp, 20);
+    expect(gopnik.maxHp, 10);
     expect(gopnik.diceFaces, [1, 2, 2, 3, 3, 4]);
   });
 

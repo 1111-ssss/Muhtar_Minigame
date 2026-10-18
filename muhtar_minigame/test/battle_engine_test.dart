@@ -18,6 +18,19 @@ class _MaxRandom implements Random {
   int nextInt(int max) => max - 1;
 }
 
+class _MinRandom implements Random {
+  const _MinRandom();
+
+  @override
+  bool nextBool() => false;
+
+  @override
+  double nextDouble() => 0;
+
+  @override
+  int nextInt(int max) => 0;
+}
+
 void main() {
   Fighter player({List<Dice>? dice, int hp = 30}) => Fighter(
     name: 'Игрок',
@@ -41,15 +54,17 @@ void main() {
     int burnDamage = 0,
     int baseHealing = 0,
     double healingChance = 0,
+    int hp = 30,
   }) => Fighter(
     name: 'Враг',
     maxHp: 30,
+    initialHp: hp,
     attackFaces: const [4],
     actsFirst: first,
     burnDamage: burnDamage,
     baseHealing: baseHealing,
     healingChance: healingChance,
-    baseShield: 2,
+    baseShield: 0,
     appearance: 'goblin',
   );
 
@@ -93,7 +108,7 @@ void main() {
   test('лечение врага появляется в preview в конце раунда', () {
     final battle = BattleEngine(
       player: player(),
-      enemy: enemy(baseHealing: 5, healingChance: 1),
+      enemy: enemy(baseHealing: 5, healingChance: 1, hp: 25),
       playerDiceCount: 1,
       random: const _MaxRandom(),
     )..startTurn();
@@ -114,7 +129,13 @@ void main() {
 
   test('начало боя безопасно заполняет хотбар при пустых слотах', () {
     final battle = BattleEngine(
-      player: player(),
+      player: player(
+        dice: const [
+          Dice(id: 'one', name: 'Одна', baseFaces: [1]),
+          Dice(id: 'two', name: 'Две', baseFaces: [1]),
+          Dice(id: 'three', name: 'Три', baseFaces: [1]),
+        ],
+      ),
       enemy: enemy(),
       playerDiceCount: 3,
     )..startTurn();
@@ -240,6 +261,10 @@ void main() {
     )..startTurn();
 
     expect(battle.healingDieDrawn, isTrue);
+    expect(
+      battle.hotbar.where((die) => die?.dice.ability == DiceAbility.doctor),
+      hasLength(1),
+    );
     battle.placeDie(0, 0);
     battle.placeDie(1, 1);
     battle.endTurn();
@@ -248,6 +273,100 @@ void main() {
       battle.hotbar.where((die) => die?.dice.ability == DiceAbility.doctor),
       isEmpty,
     );
+    expect(
+      battle.player.dice.where((die) => die.ability == DiceAbility.doctor),
+      hasLength(1),
+    );
+  });
+
+  test('враг выбирает только одно действие за ход', () {
+    BattleEngine build({
+      required Random random,
+      int baseShield = 0,
+      double shieldChance = 1,
+      int baseHealing = 5,
+    }) =>
+        BattleEngine(
+          player: player(dice: const []),
+          enemy: Fighter(
+            name: 'Враг',
+            maxHp: 30,
+            attackFaces: const [4],
+            baseShield: baseShield,
+            shieldChance: shieldChance,
+            baseHealing: baseHealing,
+            healingChance: 1,
+          ),
+          random: random,
+        )..startTurn();
+
+    final attack = build(random: const _MinRandom()).enemyIntent;
+    expect(
+      [attack.attack > 0, attack.shield > 0, attack.heal > 0]
+          .where((action) => action)
+          .length,
+      1,
+    );
+
+    final shield = build(
+      random: const _MaxRandom(),
+      baseShield: 2,
+      shieldChance: 1,
+      baseHealing: 0,
+    ).enemyIntent;
+    expect(shield.attack, 0);
+    expect(shield.shield, 2);
+    expect(shield.heal, 0);
+
+    final heal = build(random: const _MaxRandom()).enemyIntent;
+    expect(heal.attack, 0);
+    expect(heal.shield, 0);
+    expect(heal.heal, 5);
+
+    final lessFrequentShield = build(
+      random: const _MaxRandom(),
+      baseShield: 2,
+      shieldChance: .35,
+      baseHealing: 0,
+    ).enemyIntent;
+    expect(lessFrequentShield.attack, 4);
+    expect(lessFrequentShield.shield, 0);
+  });
+
+  test('щит врага не превышает восемь единиц', () {
+    final battle = BattleEngine(
+      player: player(),
+      enemy: Fighter(
+        name: 'Бронированный враг',
+        maxHp: 30,
+        attackFaces: const [4],
+        baseShield: 20,
+        shieldChance: 1,
+      ),
+      random: const _MaxRandom(),
+    )..startTurn();
+
+    expect(battle.enemyIntent.shield, maxEnemyShield);
+    expect(battle.previewFor(battle.enemy).availableShield, maxEnemyShield);
+    battle.endTurn();
+    expect(battle.enemy.shield, maxEnemyShield);
+
+    final nearlyFull = BattleEngine(
+      player: player(dice: const []),
+      enemy: Fighter(
+        name: 'Почти полный щит',
+        maxHp: 30,
+        initialShield: maxEnemyShield - 1,
+        attackFaces: const [0],
+        baseShield: 20,
+        shieldChance: 1,
+      ),
+      random: const _MaxRandom(),
+    )..startTurn();
+
+    expect(nearlyFull.enemyIntent.shield, 1);
+    nearlyFull.endTurn();
+    expect(nearlyFull.enemy.shield, maxEnemyShield);
   });
 
   test('враг получает реплику текущего раунда до атаки', () {
@@ -293,7 +412,9 @@ void main() {
 
     final placed = battle.hotbar[1]!;
     expect(battle.placeDie(1, 4), isTrue);
+    expect(battle.energy, 1);
     expect(battle.removeDie(4), isTrue);
+    expect(battle.energy, BattleEngine.maxEnergy);
     expect(battle.board[4], isNull);
     expect(battle.hotbar[1], same(placed));
   });
@@ -551,7 +672,7 @@ void main() {
 
     battle.endTurn();
 
-    expect(battle.player.hp, 18);
+    expect(battle.player.hp, 17);
 
     final cappedBattle = doctorBattle(29);
     expect(cappedBattle.placeDie(0, 4), isTrue);
@@ -592,6 +713,35 @@ void main() {
 
     expect(battle.player.hp, lessThan(10));
     expect(battle.player.burn, 3);
+  });
+
+  test('горение Шаурмека не проходит сквозь щит', () {
+    final battle = BattleEngine(
+      player: Fighter(
+        name: 'Игрок',
+        maxHp: 30,
+        initialHp: 20,
+        initialShield: 3,
+        dice: const [],
+        isPlayer: true,
+      ),
+      enemy: Fighter(
+        name: 'Шаурмек',
+        maxHp: 32,
+        attackFaces: const [0],
+        actsFirst: true,
+        burnDamage: 3,
+      ),
+    )..startTurn();
+
+    battle.endTurn();
+    expect(battle.player.burn, 3);
+    expect(battle.player.shield, 3);
+
+    battle.endTurn();
+
+    expect(battle.player.hp, 20);
+    expect(battle.player.shield, 0);
   });
 
   test('корни Виктора выбирают клетки после завершения расстановки', () {
@@ -681,6 +831,7 @@ void main() {
       ),
       enemy: Fighter(name: 'Враг', maxHp: 30, attackFaces: const [6]),
       artifacts: const {Artifact.ironThread: 1},
+      random: const _MaxRandom(),
     )..startTurn();
 
     expect(battle.placeDie(0, 4), isTrue);
@@ -704,6 +855,7 @@ void main() {
             id: 'guardian',
             name: 'Щит',
             baseFaces: [3],
+            level: 3,
             ability: DiceAbility.guardian,
           ),
         ],
@@ -754,5 +906,64 @@ void main() {
     )..startTurn();
 
     expect(battle.playerIntent.shield, 2);
+  });
+
+  test('железная нить не срабатывает, если щит уже есть в начале хода', () {
+    final battle = BattleEngine(
+      player: Fighter(
+        name: 'Игрок',
+        maxHp: 30,
+        initialShield: 1,
+        dice: const [
+          Dice(
+            id: 'guardian',
+            name: 'Щит',
+            baseFaces: [6],
+            level: 6,
+            ability: DiceAbility.guardian,
+          ),
+        ],
+        isPlayer: true,
+      ),
+      enemy: enemy(),
+      artifacts: const {Artifact.ironThread: 1},
+      random: const _MaxRandom(),
+    )..startTurn();
+
+    expect(battle.placeDie(0, 4), isTrue);
+    expect(battle.playerIntent.shield, 6);
+  });
+
+  test('защита игрока складывается без ограничения восемью', () {
+    final battle = BattleEngine(
+      player: player(
+        dice: const [
+          Dice(
+            id: 'guardian-one',
+            name: 'Щит 1',
+            baseFaces: [6],
+            level: 6,
+            ability: DiceAbility.guardian,
+          ),
+          Dice(
+            id: 'guardian-two',
+            name: 'Щит 2',
+            baseFaces: [6],
+            level: 6,
+            ability: DiceAbility.guardian,
+          ),
+        ],
+      ),
+      enemy: Fighter(name: 'Враг', maxHp: 30, attackFaces: const [0]),
+      playerDiceCount: 2,
+      random: const _MaxRandom(),
+    )..startTurn();
+
+    expect(battle.placeDie(0, 0), isTrue);
+    expect(battle.placeDie(1, 1), isTrue);
+    expect(battle.playerIntent.shield, 12);
+    expect(battle.previewFor(battle.player).availableShield, 12);
+    battle.endTurn();
+    expect(battle.player.shield, 12);
   });
 }

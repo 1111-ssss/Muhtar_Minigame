@@ -55,7 +55,7 @@ class Locations {
       [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
     ],
     spawn: (1, 5),
-    npcs: const [],
+    npcs: [],
     enemies: [
       EnemySpawn('gopnik', 4, 4),
       EnemySpawn('gopnik', 11, 2),
@@ -326,7 +326,7 @@ class Locations {
       LocationProp(
         id: 'bridge_crate_13_2',
         kind: LocationPropKind.crate,
-        col: 13,
+        col: 14,
         row: 2,
         variant: 0,
       ),
@@ -341,7 +341,7 @@ class Locations {
       LocationProp(
         id: 'bridge_flower_bed_25_5',
         kind: LocationPropKind.flowerBed,
-        col: 25,
+        col: 26,
         row: 5,
         variant: 1,
       ),
@@ -359,12 +359,33 @@ class Locations {
       LocationProp(
         id: 'bridge_potato',
         kind: LocationPropKind.rock,
-        col: 17,
-        row: 2,
+        col: 18,
+        row: 3,
         blocksMovement: false,
         searchable: true,
         specialItemId: 'potato',
         variant: 2,
+      ),
+      LocationProp(
+        id: 'bridge_tree_right_34_1',
+        kind: LocationPropKind.tree,
+        col: 34,
+        row: 1,
+        variant: 2,
+      ),
+      LocationProp(
+        id: 'bridge_bush_right_34_6',
+        kind: LocationPropKind.bush,
+        col: 34,
+        row: 6,
+        variant: 0,
+      ),
+      LocationProp(
+        id: 'bridge_flower_bed_right_36_4',
+        kind: LocationPropKind.flowerBed,
+        col: 36,
+        row: 4,
+        variant: 0,
       ),
     ],
     exits: [

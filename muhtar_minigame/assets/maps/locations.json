@@ -1195,7 +1195,7 @@
         {
           "id": "bridge_crate_13_2",
           "kind": "crate",
-          "col": 13,
+          "col": 14,
           "row": 2,
           "width": 1,
           "height": 1,
@@ -1217,7 +1217,7 @@
         {
           "id": "bridge_flower_bed_25_5",
           "kind": "flowerBed",
-          "col": 25,
+          "col": 26,
           "row": 5,
           "width": 1,
           "height": 1,
@@ -1262,14 +1262,47 @@
         {
           "id": "bridge_potato",
           "kind": "rock",
-          "col": 17,
-          "row": 2,
+          "col": 18,
+          "row": 3,
           "width": 1,
           "height": 1,
           "blocksMovement": false,
           "variant": 2,
           "searchable": true,
           "specialItemId": "potato"
+        },
+        {
+          "id": "bridge_tree_right_34_1",
+          "kind": "tree",
+          "col": 34,
+          "row": 1,
+          "width": 1,
+          "height": 1,
+          "blocksMovement": true,
+          "variant": 2,
+          "searchable": false
+        },
+        {
+          "id": "bridge_bush_right_34_6",
+          "kind": "bush",
+          "col": 34,
+          "row": 6,
+          "width": 1,
+          "height": 1,
+          "blocksMovement": true,
+          "variant": 0,
+          "searchable": false
+        },
+        {
+          "id": "bridge_flower_bed_right_36_4",
+          "kind": "flowerBed",
+          "col": 36,
+          "row": 4,
+          "width": 1,
+          "height": 1,
+          "blocksMovement": true,
+          "variant": 0,
+          "searchable": false
         }
       ],
       "outsideTile": 6,

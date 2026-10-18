@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/artifact.dart';
 import '../../domain/dice.dart';
+import '../../domain/equipment.dart';
 
 enum GameSymbol { heart, sword, incoming, shield, heal, fire, upgrade, reroll }
 
@@ -185,6 +186,123 @@ RarityPalette diceRarityPalette(DiceRarity rarity) => switch (rarity) {
     border: Color(0xFFE4A746),
   ),
 };
+
+RarityPalette abilityRarityPalette(AbilityRarity rarity) => switch (rarity) {
+  AbilityRarity.common => const RarityPalette(
+    background: Color(0xFF33434A),
+    foreground: Color(0xFFC5D6D8),
+    border: Color(0xFF71949B),
+  ),
+  AbilityRarity.rare => const RarityPalette(
+    background: Color(0xFF2C4C75),
+    foreground: Color(0xFFB9D9FF),
+    border: Color(0xFF6EA6E8),
+  ),
+  AbilityRarity.epic => const RarityPalette(
+    background: Color(0xFF583773),
+    foreground: Color(0xFFF1C2FF),
+    border: Color(0xFFC783E0),
+  ),
+  AbilityRarity.legendary => const RarityPalette(
+    background: Color(0xFF704B25),
+    foreground: Color(0xFFFFD993),
+    border: Color(0xFFE4A746),
+  ),
+};
+
+GameSymbol abilitySymbol(SlotEffect effect) => switch (effect) {
+  SlotEffect.damage => GameSymbol.sword,
+  SlotEffect.shield => GameSymbol.shield,
+  SlotEffect.heal => GameSymbol.heal,
+  SlotEffect.burn || SlotEffect.poison => GameSymbol.fire,
+  SlotEffect.upgrade => GameSymbol.upgrade,
+};
+
+class EnemyAbilityBadge extends StatelessWidget {
+  const EnemyAbilityBadge({required this.ability, this.size = 34, super.key});
+
+  final EquipmentSlot ability;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = abilityRarityPalette(ability.rarity);
+    final description = ability.description.isEmpty
+        ? '${ability.effect.title}. Условие: ${ability.ruleDescription}.'
+        : ability.description;
+    return Tooltip(
+      key: ValueKey('enemy-ability-${ability.id}'),
+      triggerMode: TooltipTriggerMode.tap,
+      richMessage: TextSpan(
+        children: [
+          TextSpan(
+            text: '${ability.name}\n',
+            style: TextStyle(
+              color: palette.foreground,
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+            ),
+          ),
+          TextSpan(
+            text: '${ability.rarity.title}\n\n',
+            style: TextStyle(
+              color: palette.foreground.withValues(alpha: .9),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextSpan(
+            text: description,
+            style: const TextStyle(color: Colors.white, height: 1.3),
+          ),
+        ],
+      ),
+      decoration: BoxDecoration(
+        color: palette.background,
+        border: Border.all(color: palette.border, width: 1.5),
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black54,
+            blurRadius: 14,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(12),
+      constraints: const BoxConstraints(maxWidth: 290),
+      preferBelow: false,
+      waitDuration: const Duration(milliseconds: 160),
+      showDuration: const Duration(seconds: 8),
+      child: Semantics(
+        button: true,
+        label: '${ability.name}, ${ability.rarity.title}. $description',
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: palette.background,
+            border: Border.all(color: palette.border, width: 1.5),
+            borderRadius: BorderRadius.circular(7),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black54,
+                blurRadius: 5,
+                offset: Offset(1, 2),
+              ),
+            ],
+          ),
+          child: Center(
+            child: GameIcon(
+              abilitySymbol(ability.effect),
+              color: palette.foreground,
+              size: size * .58,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class DiceHoverCard extends StatelessWidget {
   const DiceHoverCard({required this.dice, required this.child, super.key});

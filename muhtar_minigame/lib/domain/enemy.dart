@@ -20,6 +20,7 @@ class EnemyArchetype {
     this.attackHits = 1,
     this.burnDamage = 0,
     this.startingShield = 0,
+    this.shieldChance = .5,
     this.attackPhrases = const [],
     this.rootCells = 0,
     this.coinStealChance = 0,
@@ -50,6 +51,9 @@ class EnemyArchetype {
   final bool appliesBurn;
   final int burnDamage;
   final int startingShield;
+
+  /// Вероятность выбрать защиту вместо атаки в раунде.
+  final double shieldChance;
 
   /// Реплики, которые враг произносит по очереди в начале раундов.
   final List<String> attackPhrases;
