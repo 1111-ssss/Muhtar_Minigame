@@ -1237,7 +1237,7 @@ class _FighterPanel extends StatefulWidget {
 }
 
 class _FighterPanelState extends State<_FighterPanel>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _hit;
   late final AnimationController _defeat;
   Timer? _typingTimer;
@@ -1352,35 +1352,55 @@ class _FighterPanelState extends State<_FighterPanel>
         ],
       ),
       clipBehavior: Clip.antiAlias,
-       child: Image.asset(
-         'assets/portraits/${fighter.appearance}.png',
-         fit: BoxFit.cover,
-         errorBuilder: (_, error, stack) => Center(
-           child: fighter.appearance == 'player_kartofla'
-               ? const SizedBox.expand(
-                   child: CustomPaint(painter: _KartoflaPortraitPainter()),
-                 )
-               : Column(
-                   mainAxisSize: MainAxisSize.min,
-                   children: [
-                     const Icon(
-                       Icons.image_outlined,
-                       size: 48,
-                       color: Color(0xFFABA1B5),
-                     ),
-                     const SizedBox(height: 12),
-                     Text(
-                       fighter.name,
-                       textAlign: TextAlign.center,
-                       style: const TextStyle(
-                         color: Color(0xFFD4C8DD),
-                         fontSize: 18,
-                       ),
-                     ),
-                   ],
-                 ),
-         ),
-       ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/portraits/${fighter.appearance}.png',
+              fit: BoxFit.cover,
+              errorBuilder: (_, error, stack) => Center(
+                child: fighter.appearance == 'player_kartofla'
+                    ? const SizedBox.expand(
+                        child: CustomPaint(painter: _KartoflaPortraitPainter()),
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.image_outlined,
+                            size: 48,
+                            color: Color(0xFFABA1B5),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            fighter.name,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Color(0xFFD4C8DD),
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+          if (!fighter.isPlayer && fighter.equipment.isNotEmpty)
+            Positioned(
+              top: 8,
+              left: 8,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final ability in fighter.equipment) ...[
+                    EnemyAbilityBadge(ability: ability, size: 44),
+                    const SizedBox(height: 5),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
     );
     return SizedBox(
       width: widget.width,
@@ -1420,25 +1440,26 @@ class _FighterPanelState extends State<_FighterPanel>
                         label: 'Нанесёт урон',
                         color: const Color(0xFFFFD281),
                       ),
-              fighter.hideStats
-                  ? _unknownStat(
-                      key: const ValueKey('incoming-unknown'),
-                      symbol: GameSymbol.incoming,
-                      label: 'Потеряет HP',
-                      color: const Color(0xFFFF946E),
-                    )
-                  : AnimatedStat(
-                key: const ValueKey('incoming'),
-                symbol: GameSymbol.incoming,
-                value: preview.incomingDamage,
-                valueText: _damageText(
-                  preview.incomingDamage,
-                  preview.incomingDamagePerHit,
-                  preview.incomingHits,
+              if (!fighter.isPlayer)
+                fighter.hideStats
+                    ? _unknownStat(
+                        key: const ValueKey('incoming-unknown'),
+                        symbol: GameSymbol.incoming,
+                        label: 'Потеряет HP',
+                        color: const Color(0xFFFF946E),
+                      )
+                    : AnimatedStat(
+                  key: const ValueKey('incoming'),
+                  symbol: GameSymbol.incoming,
+                  value: preview.incomingDamage,
+                  valueText: _damageText(
+                    preview.incomingDamage,
+                    preview.incomingDamagePerHit,
+                    preview.incomingHits,
+                  ),
+                  label: 'Потеряет HP',
+                  color: const Color(0xFFFF946E),
                 ),
-                label: 'Потеряет HP',
-                color: const Color(0xFFFF946E),
-              ),
               fighter.hideStats
                   ? _unknownStat(
                       key: const ValueKey('shield-unknown'),

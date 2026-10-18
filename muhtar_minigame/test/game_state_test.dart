@@ -122,7 +122,7 @@ void main() {
 
     test('боевой набор увеличивается до шести кубиков разных типов', () {
       final state = GameState()..addCoins(10000);
-      expect(state.dice.last.ability, DiceAbility.doctor);
+      expect(state.dice.last.ability, DiceAbility.upgrade);
       expect(state.addDiceType('ember'), isTrue);
       expect(state.addDiceType('guardian'), isTrue);
       expect(state.addDiceType('d6'), isTrue);
@@ -271,7 +271,10 @@ void main() {
             ),
           );
 
-        expect(state.mergeDice(1, 2), isTrue);
+        final firstIndex = state.dice.length - 2;
+        final secondIndex = state.dice.length - 1;
+
+        expect(state.mergeDice(firstIndex, secondIndex), isTrue);
         expect(state.inventory.where((dice) => dice.level == 3), hasLength(1));
       },
     );
@@ -413,13 +416,14 @@ void main() {
           (prop) => prop.specialItemId == 'potato',
         );
         state.activateQuest('q_potato_bridge', npcId: 'wb_employee');
-        for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
-          state.searchProp(potato.id);
-        }
+        final picked = state.pickUpSpecialItem(potato.id);
 
+        expect(picked.completed, isTrue);
         expect(state.hasItem('potato'), isTrue);
         expect(state.searchResult(potato.id)!.itemId, 'potato');
         expect(state.isPropVisible(potato), isFalse);
+        expect(state.pickUpSpecialItem(potato.id), same(picked));
+        expect(state.itemCount('potato'), 1);
 
         final directory = await Directory.systemTemp.createTemp(
           'muhtar-potato-',

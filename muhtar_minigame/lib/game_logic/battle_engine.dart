@@ -4,6 +4,10 @@ import 'package:flutter/foundation.dart';
 
 import '../domain/dice.dart';
 import '../domain/artifact.dart';
+import '../domain/equipment.dart';
+
+/// Максимальное количество щита, которое может одновременно иметь враг.
+const maxEnemyShield = 8;
 
 @immutable
 class RolledDie {
@@ -29,6 +33,20 @@ class TurnEffects {
   final int shield;
   final int heal;
   final int burn;
+
+  TurnEffects copyWith({
+    int? attack,
+    int? attackHits,
+    int? shield,
+    int? heal,
+    int? burn,
+  }) => TurnEffects(
+    attack: attack ?? this.attack,
+    attackHits: attackHits ?? this.attackHits,
+    shield: shield ?? this.shield,
+    heal: heal ?? this.heal,
+    burn: burn ?? this.burn,
+  );
 }
 
 @immutable
@@ -98,13 +116,14 @@ class Fighter {
   Fighter({
     required this.name,
     required this.maxHp,
-    this.dice = const [],
+    List<Dice> dice = const [],
     this.isPlayer = false,
     int? initialHp,
     this.attackFaces = const [],
     this.baseAttack = 0,
     int attackHits = 1,
     this.baseShield = 0,
+    this.shieldChance = .5,
     this.baseHealing = 0,
     this.healingChance = 1,
     this.hideStats = false,
@@ -115,8 +134,11 @@ class Fighter {
     this.equipment = const [],
     int initialShield = 0,
     int rootCells = 0,
-  }) : hp = (initialHp ?? maxHp).clamp(0, maxHp).toInt(),
-       shield = initialShield,
+  }) : dice = List<Dice>.from(dice),
+       hp = (initialHp ?? maxHp).clamp(0, maxHp).toInt(),
+       shield = isPlayer
+           ? initialShield
+           : initialShield.clamp(0, maxEnemyShield).toInt(),
        rootCells = rootCells.clamp(0, 9).toInt(),
        attackHits = attackHits.clamp(1, 99).toInt();
 
@@ -128,6 +150,7 @@ class Fighter {
   final int baseAttack;
   final int attackHits;
   final int baseShield;
+  final double shieldChance;
   final int baseHealing;
   final double healingChance;
   final bool hideStats;
@@ -135,7 +158,7 @@ class Fighter {
   final int burnDamage;
   final String appearance;
   final List<String> attackPhrases;
-  final List<dynamic> equipment;
+  final List<EquipmentSlot> equipment;
   final int rootCells;
   String attackPhrase = '';
   int hp;
@@ -295,18 +318,38 @@ class BattleEngine extends ChangeNotifier {
       }
     }
     rerollsRemaining = rerollsPerRound;
-    _enemyIntent = TurnEffects(
-      attack: enemy.attackFaces.isEmpty
-          ? enemy.baseAttack
-          : enemy.attackFaces[_random.nextInt(enemy.attackFaces.length)],
+    final attack = enemy.attackFaces.isEmpty
+        ? enemy.baseAttack
+        : enemy.attackFaces[_random.nextInt(enemy.attackFaces.length)];
+    final shield = min(
+      max(0, maxEnemyShield - enemy.shield),
+      max(0, enemy.baseShield),
+    );
+    final shieldProbability = shield > 0
+        ? enemy.shieldChance.clamp(0.0, 1.0).toDouble()
+        : 0.0;
+    final healProbability = enemy.baseHealing > 0
+        ? enemy.healingChance.clamp(0.0, 1.0).toDouble()
+        : 0.0;
+    final attackIntent = TurnEffects(
+      attack: attack,
       attackHits: enemy.attackHits,
-      shield: enemy.baseShield,
-      heal: enemy.baseHealing > 0 &&
-              _random.nextDouble() < enemy.healingChance
-          ? enemy.baseHealing
-          : 0,
       burn: enemy.burnDamage,
     );
+    if (shieldProbability == 0 && healProbability == 0) {
+      _enemyIntent = attackIntent;
+    } else {
+      final actionRoll = _random.nextDouble();
+      final healThreshold =
+          shieldProbability + (1 - shieldProbability) * healProbability;
+      // Враг выбирает ровно одно действие. Вероятность щита — фактическая,
+      // а лечение получает оставшееся после щита окно случайного броска.
+      _enemyIntent = actionRoll < shieldProbability
+          ? TurnEffects(shield: shield)
+          : actionRoll < healThreshold
+          ? TurnEffects(heal: enemy.baseHealing)
+          : attackIntent;
+    }
     enemy.attackPhrase = _attackPhraseForRound();
     player.attackPhrase = _playerAttackPhraseForRound();
   }
@@ -493,10 +536,12 @@ class BattleEngine extends ChangeNotifier {
         _isLocked(_board[cell]!)) {
       return false;
     }
+    final die = _board[cell]!;
     final freeSlot = _hotbar.indexWhere((die) => die == null);
     if (freeSlot < 0) return false;
-    _hotbar[freeSlot] = _board[cell];
+    _hotbar[freeSlot] = die;
     _board[cell] = null;
+    energy = min(maxEnergy, energy + _energyCost(die));
     notifyListeners();
     return true;
   }
@@ -626,7 +671,9 @@ class BattleEngine extends ChangeNotifier {
 
   TurnEffects get playerIntent {
     var attack = 0;
-    var shield = 2 * (artifacts[Artifact.ironThread] ?? 0);
+    var shield = player.shield <= 0
+        ? 2 * (artifacts[Artifact.ironThread] ?? 0)
+        : 0;
     var heal = 2 * (artifacts[Artifact.fieldKit] ?? 0);
     var burn = 0;
     void applyDie(int cell, RolledDie die) {
@@ -724,21 +771,37 @@ class BattleEngine extends ChangeNotifier {
     );
     p.tickBurn(
       player.burn,
-      (amount) => record(
-        BattleEventType.burn,
-        BattleSide.player,
-        BattleSide.player,
-        amount,
-      ),
+      (amount, blocked) {
+        record(
+          BattleEventType.blocked,
+          BattleSide.player,
+          BattleSide.player,
+          blocked,
+        );
+        record(
+          BattleEventType.burn,
+          BattleSide.player,
+          BattleSide.player,
+          amount,
+        );
+      },
     );
     e.tickBurn(
       enemy.burn,
-      (amount) => record(
-        BattleEventType.burn,
-        BattleSide.enemy,
-        BattleSide.enemy,
-        amount,
-      ),
+      (amount, blocked) {
+        record(
+          BattleEventType.blocked,
+          BattleSide.enemy,
+          BattleSide.enemy,
+          blocked,
+        );
+        record(
+          BattleEventType.burn,
+          BattleSide.enemy,
+          BattleSide.enemy,
+          amount,
+        );
+      },
     );
     if (enemy.actsFirst) {
       e.attack(p, record);
@@ -822,13 +885,41 @@ class _Resolution {
 class _ResolvedFighter {
   _ResolvedFighter(
     Fighter fighter,
-    this.intent, {
+    TurnEffects requestedIntent, {
     required this.side,
     this.immune = false,
-  }) : hp = fighter.hp,
+  }) : intent = _normalizedIntent(fighter, requestedIntent, side),
+       hp = fighter.hp,
        maxHp = fighter.maxHp,
-       shieldAtStart = fighter.shield + intent.shield,
-       shield = fighter.shield + intent.shield;
+       shieldAtStart = _shieldAtStart(fighter, requestedIntent, side),
+       shield = _shieldAtStart(fighter, requestedIntent, side);
+
+  static TurnEffects _normalizedIntent(
+    Fighter fighter,
+    TurnEffects intent,
+    BattleSide side,
+  ) {
+    if (side != BattleSide.enemy) return intent;
+    final currentShield = min(maxEnemyShield, max(0, fighter.shield));
+    return intent.copyWith(
+      shield: min(
+        max(0, intent.shield),
+        max(0, maxEnemyShield - currentShield),
+      ),
+    );
+  }
+
+  static int _shieldAtStart(
+    Fighter fighter,
+    TurnEffects requestedIntent,
+    BattleSide side,
+  ) {
+    final currentShield = side == BattleSide.enemy
+        ? min(maxEnemyShield, max(0, fighter.shield))
+        : max(0, fighter.shield);
+    final intent = _normalizedIntent(fighter, requestedIntent, side);
+    return currentShield + intent.shield;
+  }
 
   final TurnEffects intent;
   final BattleSide side;
@@ -848,12 +939,19 @@ class _ResolvedFighter {
   int healing = 0;
   int burnApplied = 0;
 
-  void tickBurn(int damage, void Function(int amount) record) {
+  void tickBurn(
+    int damage,
+    void Function(int amount, int blocked) record,
+  ) {
     if (hp <= 0 || immune) return;
-    final appliedDamage = min(hp, damage);
+    final absorbed = min(shield, damage);
+    blocked += absorbed;
+    shield -= absorbed;
+    final remainingDamage = damage - absorbed;
+    final appliedDamage = min(hp, remainingDamage);
     incoming += appliedDamage;
-    hp = max(0, hp - damage);
-    record(appliedDamage);
+    hp = max(0, hp - remainingDamage);
+    record(appliedDamage, absorbed);
   }
 
   void attack(
@@ -892,7 +990,7 @@ class _ResolvedFighter {
       record(BattleEventType.damage, side, target.side, appliedDamage);
     }
     if (appliedPerHit.isNotEmpty && appliedPerHit.toSet().length == 1) {
-      target.incomingDamagePerHit = appliedPerHit.single;
+      target.incomingDamagePerHit = appliedPerHit.toSet().single;
       target.incomingHits = appliedPerHit.length;
     }
     if (target.hp > 0) {
