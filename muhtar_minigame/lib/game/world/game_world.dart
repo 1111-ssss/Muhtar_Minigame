@@ -5,6 +5,7 @@ import 'package:flame/components.dart';
 import '../../domain/game_content.dart';
 import '../../domain/location.dart';
 import '../../domain/locations.dart';
+import '../../domain/quest.dart';
 import '../../game_logic/game_state.dart';
 import '../../game_logic/pathfinding.dart';
 import 'enemy_entity.dart';
@@ -138,7 +139,15 @@ class GameWorld extends World {
       location = Locations.byId(locationId) ?? Locations.meadow;
       _pathfinding = Pathfinding(location);
 
-      map = IsometricMap(location, propFilter: gameState.isPropVisible);
+      map = IsometricMap(
+        location,
+        propFilter: gameState.isPropVisible,
+        propHighlight: (prop) {
+          if (prop.id != 'wb_fitting_room') return false;
+          final state = gameState.quest('q_kartofla_videos')?.state;
+          return state == QuestState.notStarted || state == QuestState.active;
+        },
+      );
       await add(map);
 
       final requestedSpawn =
@@ -239,7 +248,8 @@ class GameWorld extends World {
     // Тап по интерактивному объекту или кусту/мусорному ведру — подходим к
     // объекту и вызываем соответствующее действие, когда игрок действительно
     // оказался рядом.
-    final prop = _interactablePropAt(col, row);
+    final prop =
+        _interactablePropAt(col, row) ?? map.visualPropAt(worldPosition);
     if (prop != null) {
       _approachToProp(prop);
       return;

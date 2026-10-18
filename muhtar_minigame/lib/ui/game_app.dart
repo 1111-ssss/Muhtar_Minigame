@@ -27,6 +27,7 @@ import 'quest/insulin_choice_overlay.dart';
 import 'quest/trip_overlay.dart';
 import 'quest/video_sequence_overlay.dart';
 import 'search/search_overlay.dart';
+import 'search/potato_pickup_overlay.dart';
 import 'transition/location_transition_overlay.dart';
 import 'upgrade/upgrade_overlay.dart';
 import 'settings/settings_overlay.dart';
@@ -324,6 +325,13 @@ class GameView extends StatelessWidget {
               },
             );
           },
+          MuhtarGame.overlayPotatoPickup: (context, MuhtarGame game) =>
+              PotatoPickupOverlay(
+                onPickUp: () {
+                  game.pickUpPotato();
+                },
+                onClose: game.closePotatoPickup,
+              ),
           MuhtarGame.overlaySongMiniGame: (context, MuhtarGame game) =>
               SongMinigameOverlay(
                 onSolved: game.completeSongMiniGame,

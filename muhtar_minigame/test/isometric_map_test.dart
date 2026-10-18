@@ -142,6 +142,24 @@ void main() {
         ),
         isEmpty,
       );
+      final potato = Locations.ruins.propById('bridge_potato')!;
+      expect((potato.col, potato.row), (18, 3));
+      expect(
+        Locations.ruins.props.map((prop) => prop.id),
+        containsAll(<String>[
+          'bridge_tree_right_34_1',
+          'bridge_bush_right_34_6',
+          'bridge_flower_bed_right_36_4',
+        ]),
+      );
+      expect(
+        Locations.ruins.props
+            .where((prop) => prop.col >= 28)
+            .every((prop) => !Locations.ruins.exits.any(
+              (exit) => exit.col == prop.col && exit.row == prop.row,
+            )),
+        isTrue,
+      );
       for (var row = 0; row < Locations.ruins.rows; row++) {
         for (var col = 0; col < Locations.ruins.cols; col++) {
           final isExit = Locations.ruins.exitAt(col, row) != null;
