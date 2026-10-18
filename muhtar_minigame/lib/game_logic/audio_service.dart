@@ -22,11 +22,14 @@ enum GameSound {
 
 /// Фоновые композиции, подобранные для текущих локаций и режимов игры.
 enum MusicTrack {
+  menu,
   station,
   park,
   bridge,
   exploration,
-  shop,
+  donerShop,
+  kopeechkaShop,
+  cheburechnayaShop,
   college,
   chill,
   retro,
@@ -37,11 +40,14 @@ enum MusicTrack {
 
 extension MusicTrackInfo on MusicTrack {
   String get fileName => switch (this) {
+    MusicTrack.menu => 'menu_bg_music_1.wav',
     MusicTrack.station => 'station_bg_music_1.wav',
     MusicTrack.park => 'park_bg_music_1.wav',
     MusicTrack.bridge => 'bridge_bg_music_1.wav',
     MusicTrack.exploration => 'exploration_bg_music_1.wav',
-    MusicTrack.shop => 'shop_bg_music_1.wav',
+    MusicTrack.donerShop => 'shop_bg_music_1.wav',
+    MusicTrack.kopeechkaShop => 'shop_bg_music_2.wav',
+    MusicTrack.cheburechnayaShop => 'shop_bg_music_3.wav',
     MusicTrack.college => 'college_bg_music_1.wav',
     MusicTrack.chill => 'chill_bg_music_1.wav',
     MusicTrack.retro => 'retro_bg_music_1.wav',
@@ -50,6 +56,20 @@ extension MusicTrackInfo on MusicTrack {
     MusicTrack.puzzle => 'puzzle_bg_music_1.wav',
   };
 }
+
+MusicTrack musicTrackForLocation(String locationId) => switch (locationId) {
+  'meadow' => MusicTrack.station,
+  'forest' => MusicTrack.park,
+  'ruins' => MusicTrack.bridge,
+  'horse' => MusicTrack.exploration,
+  'doner' => MusicTrack.donerShop,
+  'kopeechka' => MusicTrack.kopeechkaShop,
+  'cheburechnaya' => MusicTrack.cheburechnayaShop,
+  'college' => MusicTrack.college,
+  'dormitory' => MusicTrack.chill,
+  'wb' => MusicTrack.retro,
+  _ => MusicTrack.exploration,
+};
 
 /// Локальный кроссплатформенный слой коротких звуков.
 ///
@@ -104,19 +124,8 @@ class AudioService extends ChangeNotifier {
     }
   }
 
-  Future<void> playLocationMusic(String locationId) => playMusic(
-    switch (locationId) {
-      'meadow' => MusicTrack.station,
-      'forest' => MusicTrack.park,
-      'ruins' => MusicTrack.bridge,
-      'horse' => MusicTrack.exploration,
-      'doner' || 'kopeechka' || 'cheburechnaya' => MusicTrack.shop,
-      'college' => MusicTrack.college,
-      'dormitory' => MusicTrack.chill,
-      'wb' => MusicTrack.retro,
-      _ => MusicTrack.exploration,
-    },
-  );
+  Future<void> playLocationMusic(String locationId) =>
+      playMusic(musicTrackForLocation(locationId));
 
   Future<void> playBattleMusic({bool boss = false}) =>
       playMusic(boss ? MusicTrack.boss : MusicTrack.fight);
