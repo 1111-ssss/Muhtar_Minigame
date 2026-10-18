@@ -61,10 +61,7 @@ class _SearchOverlayState extends State<SearchOverlay>
   void initState() {
     super.initState();
     _result = _state.searchResult(widget.prop.id);
-    _wasCompletedOnOpen =
-        _result?.completed == true &&
-        (widget.prop.kind == LocationPropKind.bush ||
-            widget.prop.specialItemId != null);
+    _wasCompletedOnOpen = _result?.completed == true;
     _shakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 360),
@@ -225,52 +222,7 @@ class _SearchOverlayState extends State<SearchOverlay>
   }
 
   Widget _buildAlreadySearched() {
-    if (_result?.rewardType == SearchRewardType.none) {
-      return _buildEmptySearch();
-    }
-    return Material(
-      color: Colors.transparent,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xE6131B2C), Color(0xF20A101C)],
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Здесь ничего нет...',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    FilledButton(
-                      onPressed: widget.onClose,
-                      child: const Text('Закрыть'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    return _buildEmptySearch();
   }
 
   Widget _buildEmptySearch() => Focus(
@@ -281,66 +233,62 @@ class _SearchOverlayState extends State<SearchOverlay>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xE6131B2C), Color(0xF20A101C)],
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Center(
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: SafeArea(
+              minimum: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 300),
+                constraints: const BoxConstraints(maxWidth: 520),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF171D2B),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFF3F805C)),
+                    color: const Color(0xE6171D2B),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xAA8BE6A0)),
                     boxShadow: const [
                       BoxShadow(
                         color: Color(0x66000000),
-                        blurRadius: 20,
-                        offset: Offset(0, 10),
+                        blurRadius: 18,
+                        offset: Offset(0, 7),
                       ),
                     ],
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                    padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
+                    child: Row(
                       children: [
                         const Icon(
                           Icons.grass_rounded,
                           color: Color(0xFF8BE6A0),
-                          size: 30,
+                          size: 24,
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'В кусте ничего нет',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Больше ничего нет',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Этот объект уже проверен.',
+                                style: TextStyle(
+                                  color: Colors.white60,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 5),
-                        const Text(
-                          'Поищи в другом месте.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white60, fontSize: 12),
-                        ),
-                        const SizedBox(height: 12),
                         TextButton(
                           onPressed: widget.onClose,
                           child: const Text('Закрыть'),
-                        ),
-                        const Text(
-                          'Space / Enter / Esc',
-                          style: TextStyle(color: Colors.white38, fontSize: 10),
                         ),
                       ],
                     ),
@@ -558,7 +506,8 @@ class _RewardPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reward = _rewardText(result);
+    final isInsulin = result?.itemId == GameState.insulinSyringeItemId;
+    final reward = isInsulin ? 'Шприц инсулина найден' : _rewardText(result);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -620,8 +569,8 @@ class _RewardPanel extends StatelessWidget {
       SearchRewardType.hp => 'здоровье',
       SearchRewardType.coins => 'монеты',
       SearchRewardType.xp => 'опыт',
-      SearchRewardType.artifactCase => 'кейс артефакта',
-      SearchRewardType.diceCase => 'кейс кости',
+      SearchRewardType.artifactCase => 'ящик артефактов',
+      SearchRewardType.diceCase => 'ящик костей',
       SearchRewardType.item => 'предмет',
       SearchRewardType.none => 'ничего',
     };

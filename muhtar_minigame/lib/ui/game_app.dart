@@ -23,6 +23,8 @@ import 'quest/quest_overlay.dart';
 import 'quest/doner_assembly_overlay.dart';
 import 'quest/song_minigame_overlay.dart';
 import 'quest/shawarma_choice_overlay.dart';
+import 'quest/insulin_choice_overlay.dart';
+import 'quest/trip_overlay.dart';
 import 'quest/video_sequence_overlay.dart';
 import 'search/search_overlay.dart';
 import 'transition/location_transition_overlay.dart';
@@ -318,6 +320,7 @@ class GameView extends StatelessWidget {
                   ),
                 );
                 unawaited(game.saveProgress());
+                game.handleSearchResult(result);
               },
             );
           },
@@ -353,6 +356,12 @@ class GameView extends StatelessWidget {
               LocationTransitionOverlay(game),
           MuhtarGame.overlaySettings: (context, MuhtarGame game) =>
               SettingsOverlay(game),
+          MuhtarGame.overlayInsulinChoice: (context, MuhtarGame game) =>
+              InsulinChoiceOverlay(
+                onChoice: (inject) => game.chooseInsulin(inject: inject),
+              ),
+          MuhtarGame.overlayTrip: (context, MuhtarGame game) =>
+              const TripOverlay(),
         },
       ),
     );

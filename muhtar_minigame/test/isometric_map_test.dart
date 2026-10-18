@@ -322,13 +322,17 @@ void main() {
     );
 
     test('new decorative tiles are walkable and used in locations', () {
-      // 12 песок, 13 цветочный луг, 14 гравий.
+      // 12 песок, 13 цветочный луг, 14 гравий, 15 дерево, 16/17 плитка.
       expect(Locations.forest.tileAt(3, 7), 12);
       expect(Locations.forest.isWalkable(3, 7), isTrue);
       expect(Locations.meadow.tileAt(2, 8), 13);
       expect(Locations.meadow.isWalkable(2, 8), isTrue);
       expect(Locations.meadow.tileAt(7, 3), 14);
       expect(Locations.meadow.isWalkable(7, 3), isTrue);
+      expect(Locations.doner.tileAt(1, 1), 15);
+      expect(Locations.doner.tileAt(3, 1), 16);
+      expect(Locations.doner.tileAt(2, 2), 17);
+      expect(Locations.doner.isWalkable(1, 1), isTrue);
       expect(Locations.horse.isWalkable(3, 1), isTrue);
       // С Коня можно выйти: путь от точки появления до клетки перехода есть.
       expect(

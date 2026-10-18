@@ -173,10 +173,10 @@ class BuildMapDocument {
       errors.add('Карта должна быть прямоугольной, от 1×1 до 128×128.');
       return errors;
     }
-    if (tiles.expand((row) => row).any((tile) => tile < 0 || tile > 14) ||
+    if (tiles.expand((row) => row).any((tile) => tile < 0 || tile > 17) ||
         outsideTile < 0 ||
-        outsideTile > 14) {
-      errors.add('Коды тайлов должны быть от 0 до 14.');
+        outsideTile > 17) {
+      errors.add('Коды тайлов должны быть от 0 до 17.');
     }
     bool inside(int col, int row) =>
         col >= 0 && col < cols && row >= 0 && row < rows;
@@ -248,7 +248,7 @@ class BuildMapDocument {
       if (region.minCol > region.maxCol ||
           region.minRow > region.maxRow ||
           region.tile < 0 ||
-          region.tile > 14) {
+          region.tile > 17) {
         errors.add('Некорректная внешняя область карты.');
       }
     }

@@ -2042,10 +2042,10 @@ class _JsonMapDialogState extends State<_JsonMapDialog> {
         (r) =>
             r is! List ||
             r.length != width ||
-            r.any((t) => t is! int || t < 0 || t > 14),
+            r.any((t) => t is! int || t < 0 || t > 17),
       )) {
         throw const FormatException(
-          'Строки tiles должны иметь одинаковую длину; коды тайлов — целые 0…14.',
+          'Строки tiles должны иметь одинаковую длину; коды тайлов — целые 0…17.',
         );
       }
       final map = BuildMapDocument.fromJson(data);

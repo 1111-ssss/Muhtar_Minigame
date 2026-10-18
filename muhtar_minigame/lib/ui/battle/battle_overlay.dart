@@ -35,7 +35,7 @@ class _BattleOverlayState extends State<BattleOverlay> {
   String _resolvingPlayerPhrase = '';
   String _resolvingEnemyPhrase = '';
   bool _resolving = false;
-  bool _endTurnQueued = false;
+  bool _showMogged = false;
   late final BattleEngine _battle;
 
   @override
@@ -67,7 +67,7 @@ class _BattleOverlayState extends State<BattleOverlay> {
   }
 
   void _selectHotbarByKeyboard(int index) {
-    if (_battle.isOver || !_battle.canAct) return;
+    if (_battle.isOver || _resolving || !_battle.canAct) return;
     if (index < 0 || index >= _battle.hotbarSize) return;
     if (_battle.hotbar[index] == null) return;
     setState(() {
@@ -77,11 +77,7 @@ class _BattleOverlayState extends State<BattleOverlay> {
   }
 
   Future<void> _finishTurn() async {
-    if (_resolving) {
-      _endTurnQueued = true;
-      if (mounted) setState(() {});
-      return;
-    }
+    if (_resolving) return;
     if (_dragging != null) return;
     if (_battle.isOver) {
       _close();
@@ -97,7 +93,20 @@ class _BattleOverlayState extends State<BattleOverlay> {
       _selectedCell = null;
       _hoveredCell = null;
     });
+    final rootedCells = _battle.prepareEndTurn();
+    if (rootedCells.isNotEmpty) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      if (!mounted) return;
+    }
     _battle.endTurn();
+    if (_battle.isOver) {
+      _showMogged = math.Random().nextDouble() < .1;
+      unawaited(
+        widget.game.audio.play(
+          _battle.player.isDead ? GameSound.defeat : GameSound.victory,
+        ),
+      );
+    }
     for (final event in _battle.lastEvents) {
       if (!mounted) return;
       setState(() => _activeEvent = event);
@@ -123,17 +132,12 @@ class _BattleOverlayState extends State<BattleOverlay> {
         _activeEvent = null;
         _resolving = false;
       });
-      final queueNext = _endTurnQueued;
-      _endTurnQueued = false;
-      if (queueNext && !_battle.isOver) {
-        await _finishTurn();
-      }
     }
   }
 
   Future<void> _removeSelectedDie() async {
     final cell = _selectedCell;
-    if (cell == null || !_battle.canAct) return;
+    if (cell == null || !_battle.canAct || _resolving) return;
     if (_battle.removeDie(cell)) {
       widget.game.audio.play(GameSound.ui);
       setState(() => _selectedCell = null);
@@ -141,7 +145,8 @@ class _BattleOverlayState extends State<BattleOverlay> {
   }
 
   bool _accept(_DieDrag data, int cell) {
-    if (!_battle.canAct ||
+    if (_resolving ||
+        !_battle.canAct ||
         data.round != _battle.round ||
         _battle.isCellRooted(cell)) {
       return false;
@@ -151,7 +156,13 @@ class _BattleOverlayState extends State<BattleOverlay> {
         !identical(source[data.index], data.die)) {
       return false;
     }
-    return data.fromBoard ? data.index != cell : _battle.board[cell] == null;
+    if (data.fromBoard) {
+      return data.index != cell &&
+          !data.die.dice.hasModifier(DiceModifier.heavy) &&
+          (_battle.board[cell] == null ||
+              !_battle.board[cell]!.dice.hasModifier(DiceModifier.heavy));
+    }
+    return _battle.board[cell] == null && _battle.canPlaceDie(data.index);
   }
 
   void _place(_DieDrag data, int cell) {
@@ -169,6 +180,34 @@ class _BattleOverlayState extends State<BattleOverlay> {
     }
   }
 
+  bool _acceptHotbarDrop(_DieDrag data) {
+    if (_resolving ||
+        !data.fromBoard ||
+        !_battle.canAct ||
+        data.round != _battle.round ||
+        data.index < 0 ||
+        data.index >= _battle.board.length ||
+        !identical(_battle.board[data.index], data.die) ||
+        data.die.dice.hasModifier(DiceModifier.heavy)) {
+      return false;
+    }
+    return _battle.hotbar.any((die) => die == null);
+  }
+
+  void _removeDraggedDie(_DieDrag data) {
+    if (!_acceptHotbarDrop(data)) return;
+    if (_battle.removeDie(data.index)) {
+      widget.game.audio.play(GameSound.ui);
+      if (mounted) {
+        setState(() {
+          _selectedHotbar = null;
+          _selectedCell = null;
+          _hoveredCell = null;
+        });
+      }
+    }
+  }
+
   _DieDrag? get _selection {
     final fromBoard = _selectedCell != null;
     final index = _selectedCell ?? _selectedHotbar;
@@ -179,7 +218,7 @@ class _BattleOverlayState extends State<BattleOverlay> {
   }
 
   void _tapCell(int cell) {
-    if (_battle.isOver) return;
+    if (_battle.isOver || _resolving) return;
     final selection = _selection;
     if (selection != null && _accept(selection, cell)) {
       _place(selection, cell);
@@ -301,6 +340,10 @@ class _BattleOverlayState extends State<BattleOverlay> {
                               activeEvent: _activeEvent,
                               round: _battle.round,
                               width: portrait ? 176 : 230,
+                              loser: _battle.isOver && _battle.player.isDead,
+                              showMogged: _showMogged &&
+                                  _battle.isOver &&
+                                  _battle.player.isDead,
                             ),
                           ),
                           Positioned(
@@ -317,6 +360,13 @@ class _BattleOverlayState extends State<BattleOverlay> {
                               activeEvent: _activeEvent,
                               round: _battle.round,
                               width: portrait ? 176 : 230,
+                              loser: _battle.isOver &&
+                                  !_battle.player.isDead &&
+                                  _battle.enemy.isDead,
+                              showMogged: _showMogged &&
+                                  _battle.isOver &&
+                                  !_battle.player.isDead &&
+                                  _battle.enemy.isDead,
                             ),
                           ),
                           Positioned(
@@ -363,13 +413,11 @@ class _BattleOverlayState extends State<BattleOverlay> {
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
-                                        onPressed: _finishTurn,
+                                        onPressed: _resolving ? null : _finishTurn,
                                         icon: const Icon(Icons.double_arrow),
                                         label: Text(
-                                          _endTurnQueued
-                                              ? 'Следующий ход поставлен в очередь'
-                                              : _resolving
-                                              ? 'Следующий ход · Enter / Space'
+                                          _resolving
+                                              ? 'Разыгрывается ход'
                                               : 'Завершить ход · Enter / Space',
                                         ),
                                       ),
@@ -421,13 +469,7 @@ class _BattleOverlayState extends State<BattleOverlay> {
   }
 
   Widget _buildBoard(double scale) {
-    final targets = <int>{};
-    for (var source = 0; source < _battle.board.length; source++) {
-      final die = _battle.board[source];
-      if (die?.dice.ability == DiceAbility.upgrade) {
-        targets.addAll(BattleEngine.upgradeTargets(source, die!.dice.level));
-      }
-    }
+    final targets = <int>{..._battle.upgradeTargetCells};
     final active = _dragging ?? _selection;
     if (_dragging?.die.dice.ability == DiceAbility.upgrade) {
       final source =
@@ -512,10 +554,52 @@ class _BattleOverlayState extends State<BattleOverlay> {
                         ),
                         child: rooted
                             ? Semantics(
-                                label:
-                                    'Клетка ${cell + 1}: заблокирована корнями, '
-                                    'размещение недоступно',
-                                child: const _RootCellVisual(),
+                                label: die == null
+                                    ? 'Клетка ${cell + 1}: заблокирована корнями, '
+                                        'размещение недоступно'
+                                    : 'Кость ${cell + 1} отменена корнями',
+                                child: die == null
+                                    ? const _RootCellVisual()
+                                    : Stack(
+                                        fit: StackFit.expand,
+                                        children: [
+                                          _DieFace(
+                                            die,
+                                            value: _battle.effectiveValueAt(cell),
+                                            selected: _selectedCell == cell,
+                                          ),
+                                          const Positioned.fill(
+                                            child: IgnorePointer(
+                                              child: ColoredBox(
+                                                color: Color(0x665D4037),
+                                              ),
+                                            ),
+                                          ),
+                                          const Positioned.fill(
+                                            child: IgnorePointer(
+                                              child: _RootCellVisual(),
+                                            ),
+                                          ),
+                                          Positioned(
+                                            key: ValueKey('cancelled-die-$cell'),
+                                            top: 2,
+                                            right: 2,
+                                            child: IgnorePointer(
+                                              child: DecoratedBox(
+                                                decoration: BoxDecoration(
+                                                  color: Color(0xDD261B20),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.close,
+                                                  size: 18,
+                                                  color: Color(0xFFFF5968),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                               )
                             : die == null
                             ? Semantics(label: 'Пустая клетка ${cell + 1}')
@@ -526,7 +610,7 @@ class _BattleOverlayState extends State<BattleOverlay> {
                               ),
                       ),
                     );
-                    if (die != null) {
+                    if (die != null && !rooted) {
                       child = _draggable(
                         child,
                         _DieDrag(cell, true, die, _battle.round),
@@ -538,7 +622,11 @@ class _BattleOverlayState extends State<BattleOverlay> {
                 ),
               ),
             ),
-          if (_selectedCell != null)
+          if (_selectedCell != null &&
+              !(_battle.board[_selectedCell!]?.dice.hasModifier(
+                    DiceModifier.heavy,
+                  ) ??
+                  false))
             Positioned(
               left: 112,
               right: 112,
@@ -634,7 +722,13 @@ class _BattleOverlayState extends State<BattleOverlay> {
   Widget _draggable(Widget child, _DieDrag data, double scale) =>
       Draggable<_DieDrag>(
         data: data,
-        maxSimultaneousDrags: _battle.canAct ? 1 : 0,
+        maxSimultaneousDrags:
+            !_resolving &&
+                _battle.canAct &&
+                (data.fromBoard || _battle.canPlaceDie(data.index)) &&
+                !data.die.dice.hasModifier(DiceModifier.heavy)
+            ? 1
+            : 0,
         // Центр кости остаётся под указателем, а не та точка, за которую
         // пользователь случайно схватил его.
         dragAnchorStrategy: childDragAnchorStrategy,
@@ -658,7 +752,13 @@ class _BattleOverlayState extends State<BattleOverlay> {
         ),
         childWhenDragging: Opacity(opacity: .3, child: child),
         onDragStarted: () => setState(() => _dragging = data),
-        onDragEnd: (_) {
+        onDragEnd: (details) {
+          // Releasing a board die outside a valid board cell is the same as
+          // returning it to the hotbar. This also makes dragging it away from
+          // the board a quick alternative to the explicit remove button.
+          if (data.fromBoard && !details.wasAccepted) {
+            _removeDraggedDie(data);
+          }
           if (mounted) {
             setState(() {
               _dragging = null;
@@ -669,95 +769,161 @@ class _BattleOverlayState extends State<BattleOverlay> {
         child: child,
       );
 
-  Widget _buildHotbar(double scale) => Container(
-    key: const ValueKey('battle-hotbar'),
-    height: 116,
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-    decoration: BoxDecoration(
-      color: const Color(0xFF222331),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: const Color(0xFF8D7855), width: 2),
-    ),
-    child: LayoutBuilder(
-      builder: (context, constraints) {
-        const rerollWidth = 90.0;
-        const gap = 12.0;
-        final diceZoneWidth = (constraints.maxWidth - rerollWidth - gap)
-            .clamp(0.0, double.infinity)
-            .toDouble();
-        return Stack(
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: SizedBox(
-                width: diceZoneWidth,
-                height: 96,
-                child: Center(
-                  child: FittedBox(
-                    fit: BoxFit.contain,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (var index = 0; index < _battle.hotbarSize; index++)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 2),
-                            child: _hotbarSlot(index, scale),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+  Widget _buildHotbar(double scale) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(left: 18, bottom: 5),
+        child: Text(
+          'ЭНЕРГИЯ ${_battle.energy}/${BattleEngine.maxEnergy}',
+          key: const ValueKey('battle-energy'),
+          style: const TextStyle(
+            fontSize: 14,
+            color: Color(0xFF78F3D0),
+            letterSpacing: 1.2,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+      DragTarget<_DieDrag>(
+        onWillAcceptWithDetails: (details) => _acceptHotbarDrop(details.data),
+        onAcceptWithDetails: (details) => _removeDraggedDie(details.data),
+        builder: (context, candidates, rejected) => Container(
+          key: const ValueKey('battle-hotbar'),
+          height: 116,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF222331),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: candidates.isNotEmpty
+                  ? const Color(0xFF87FFE1)
+                  : const Color(0xFF8D7855),
+              width: 2,
             ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: SizedBox(
-                width: rerollWidth,
-                height: 82,
-                child: Tooltip(
-                  message:
-                      'Заменить выбранную кость. Осталось ${_battle.rerollsRemaining}',
-                  child: ExcludeFocus(
-                    child: OutlinedButton(
-                      key: const ValueKey('reroll'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(rerollWidth, 82),
-                        padding: EdgeInsets.zero,
-                      ),
-                      onPressed:
-                          _selectedHotbar != null &&
-                              _battle.canAct &&
-                              _battle.rerollsRemaining > 0
-                          ? () {
-                              if (_battle.rerollDie(_selectedHotbar!)) {
-                                widget.game.audio.play(GameSound.dieReroll);
-                              }
-                            }
-                          : null,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const GameIcon(GameSymbol.reroll, size: 28),
-                          const SizedBox(height: 6),
-                          Text(
-                            '${_battle.rerollsRemaining}',
-                            style: const TextStyle(fontSize: 20),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              const rerollWidth = 90.0;
+              const gap = 12.0;
+              final diceZoneWidth = (constraints.maxWidth - rerollWidth - gap)
+                  .clamp(0.0, double.infinity)
+                  .toDouble();
+              final visibleIndexes = [
+                for (var index = 0; index < _battle.hotbarSize; index++)
+                  if (_battle.hotbar[index] != null) index,
+              ];
+              return Stack(
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      width: diceZoneWidth,
+                      height: 96,
+                      child: Center(
+                        child: FittedBox(
+                          fit: BoxFit.contain,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final index in visibleIndexes)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 2,
+                                  ),
+                                  child: _hotbarSlot(index, scale),
+                                ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: SizedBox(
+                      width: rerollWidth,
+                      height: 82,
+                      child: Tooltip(
+                        message:
+                            'Заменить выбранную кость. Осталось ${_battle.rerollsRemaining}',
+                        child: ExcludeFocus(
+                          child: OutlinedButton(
+                            key: const ValueKey('reroll'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(rerollWidth, 82),
+                              padding: EdgeInsets.zero,
+                            ),
+                            onPressed:
+                                _selectedHotbar != null &&
+                                    !_resolving &&
+                                    _battle.canAct &&
+                                    _battle.rerollsRemaining > 0
+                                ? () {
+                                    if (_battle.rerollDie(_selectedHotbar!)) {
+                                      widget.game.audio.play(GameSound.dieReroll);
+                                    }
+                                  }
+                                : null,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const GameIcon(GameSymbol.reroll, size: 28),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '${_battle.rerollsRemaining}',
+                                  style: const TextStyle(fontSize: 20),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    ],
   );
 
   Widget _hotbarSlot(int index, double scale) {
     final die = _battle.hotbar[index];
+    final unavailable = die != null && !_battle.canPlaceDie(index);
+    Widget dieVisual = die == null
+        ? DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.black26,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white12),
+            ),
+          )
+        : _DieFace(
+            die,
+            value: die.value,
+            selected: _selectedHotbar == index,
+            compact: true,
+          );
+    if (unavailable) {
+      // Затемняем локальным слоем только ограниченное лицо кости. Здесь
+      // намеренно нет ColorFiltered/Opacity над Draggable или родительским
+      // overlay: при нулевой энергии нельзя затрагивать всю сцену.
+      dieVisual = ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            dieVisual,
+            const Positioned.fill(
+              child: ColoredBox(color: Color(0x99000000)),
+            ),
+          ],
+        ),
+      );
+    }
     Widget child = SizedBox(
       width: 72,
       height: 82,
@@ -766,26 +932,13 @@ class _BattleOverlayState extends State<BattleOverlay> {
           Positioned.fill(
             child: InkWell(
               key: ValueKey('hotbar-$index'),
-              onTap: die == null || !_battle.canAct
+              onTap: die == null || _resolving || !_battle.canPlaceDie(index)
                   ? null
                   : () => setState(() {
                       _selectedHotbar = _selectedHotbar == index ? null : index;
                       _selectedCell = null;
                     }),
-              child: die == null
-                  ? DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Colors.black26,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white12),
-                      ),
-                    )
-                  : _DieFace(
-                      die,
-                      value: die.value,
-                      selected: _selectedHotbar == index,
-                      compact: true,
-                    ),
+              child: dieVisual,
             ),
           ),
           Positioned(
@@ -817,7 +970,7 @@ class _BattleOverlayState extends State<BattleOverlay> {
         ],
       ),
     );
-    if (die != null) {
+    if (die != null && !unavailable) {
       child = _draggable(
         child,
         _DieDrag(index, false, die, _battle.round),
@@ -845,41 +998,39 @@ class _RootCellVisual extends StatefulWidget {
 
 class _RootCellVisualState extends State<_RootCellVisual>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse;
+  late final AnimationController _growth;
 
   @override
   void initState() {
     super.initState();
-    _pulse = AnimationController(
+    _growth = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 840),
-    );
+      duration: const Duration(seconds: 1),
+    )..forward();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (MediaQuery.disableAnimationsOf(context)) {
-      _pulse.stop();
-      _pulse.value = 0;
-    } else if (!_pulse.isAnimating) {
-      _pulse.repeat(reverse: true);
+      _growth.stop();
+      _growth.value = 1;
     }
   }
 
   @override
   void dispose() {
-    _pulse.dispose();
+    _growth.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _pulse,
+    animation: _growth,
     builder: (context, _) => Stack(
       fit: StackFit.expand,
       children: [
-        CustomPaint(painter: _RootCellPainter(pulse: _pulse.value)),
+        CustomPaint(painter: _RootCellPainter(pulse: _growth.value)),
         Align(
           alignment: Alignment.bottomCenter,
           child: Container(
@@ -968,14 +1119,28 @@ class _RootCellPainter extends CustomPainter {
         size.width * .8,
         size.height * .84,
       );
-    canvas.drawPath(path, root);
+    final progress = Curves.easeOutCubic
+        .transform(pulse.clamp(0.0, 1.0).toDouble());
+    for (final metric in path.computeMetrics()) {
+      canvas.drawPath(metric.extractPath(0, metric.length * progress), root);
+    }
 
     final crown = Paint()
       ..color = Color.lerp(const Color(0xFF8FE8D1), Colors.white, pulse * .35)!
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, 6, crown);
-    canvas.drawCircle(Offset(size.width * .33, size.height * .68), 3.5, crown);
-    canvas.drawCircle(Offset(size.width * .67, size.height * .68), 3.5, crown);
+    if (progress > 0) {
+      canvas.drawCircle(center, 6 * progress, crown);
+      canvas.drawCircle(
+        Offset(size.width * .33, size.height * .68),
+        3.5 * progress,
+        crown,
+      );
+      canvas.drawCircle(
+        Offset(size.width * .67, size.height * .68),
+        3.5 * progress,
+        crown,
+      );
+    }
   }
 
   @override
@@ -1000,7 +1165,9 @@ class _DieFace extends StatelessWidget {
     final hasUpgrade = value != die.value;
     return Tooltip(
       message:
-          '${die.dice.name} · уровень ${die.dice.level}\n${die.dice.ability.description}',
+          '${die.dice.name} · уровень ${die.dice.level}\n'
+          '${die.dice.ability.description}\n'
+          '${die.dice.activeModifiers.isEmpty ? 'Без модификаторов' : die.dice.activeModifiers.map((modifier) => '${modifier.title}: ${modifier.description}').join('\n')}',
       child: SizedBox(
         width: compact ? 72 : 90,
         height: compact ? 82 : 90,
@@ -1051,6 +1218,8 @@ class _FighterPanel extends StatefulWidget {
     required this.activeEvent,
     required this.round,
     required this.width,
+    required this.loser,
+    required this.showMogged,
     super.key,
   });
   final Fighter fighter;
@@ -1060,6 +1229,8 @@ class _FighterPanel extends StatefulWidget {
   final BattleEvent? activeEvent;
   final int round;
   final double width;
+  final bool loser;
+  final bool showMogged;
 
   @override
   State<_FighterPanel> createState() => _FighterPanelState();
@@ -1068,6 +1239,7 @@ class _FighterPanel extends StatefulWidget {
 class _FighterPanelState extends State<_FighterPanel>
     with SingleTickerProviderStateMixin {
   late final AnimationController _hit;
+  late final AnimationController _defeat;
   Timer? _typingTimer;
   String _typedPhrase = '';
 
@@ -1078,6 +1250,11 @@ class _FighterPanelState extends State<_FighterPanel>
       vsync: this,
       duration: const Duration(milliseconds: 168),
     );
+    _defeat = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 620),
+    );
+    if (widget.loser) _defeat.forward();
     _startTyping(widget.phrase);
   }
 
@@ -1085,6 +1262,11 @@ class _FighterPanelState extends State<_FighterPanel>
   void didUpdateWidget(_FighterPanel old) {
     super.didUpdateWidget(old);
     if (widget.hitVersion != old.hitVersion) _hit.forward(from: 0);
+    if (widget.loser && !old.loser) {
+      _defeat.forward(from: 0);
+    } else if (!widget.loser && old.loser) {
+      _defeat.reset();
+    }
     if (widget.phrase != old.phrase) {
       _startTyping(widget.phrase);
     }
@@ -1094,6 +1276,7 @@ class _FighterPanelState extends State<_FighterPanel>
   void dispose() {
     _typingTimer?.cancel();
     _hit.dispose();
+    _defeat.dispose();
     super.dispose();
   }
 
@@ -1217,29 +1400,75 @@ class _FighterPanelState extends State<_FighterPanel>
                 color: const Color(0xFFFF6A86),
                 alwaysVisible: true,
               ),
-              AnimatedStat(
-                key: const ValueKey('attack'),
-                symbol: GameSymbol.sword,
-                value: preview.outgoingDamage,
-                label: 'Нанесёт урон',
-                color: const Color(0xFFFFD281),
-              ),
-              AnimatedStat(
+              if (!fighter.isPlayer)
+                fighter.hideStats
+                    ? _unknownStat(
+                        key: const ValueKey('attack-unknown'),
+                        symbol: GameSymbol.sword,
+                        label: 'Нанесёт урон',
+                        color: const Color(0xFFFFD281),
+                      )
+                    : AnimatedStat(
+                        key: const ValueKey('attack'),
+                        symbol: GameSymbol.sword,
+                        value: preview.outgoingDamage,
+                        valueText: _damageText(
+                          preview.outgoingDamage,
+                          preview.outgoingDamagePerHit,
+                          preview.outgoingHits,
+                        ),
+                        label: 'Нанесёт урон',
+                        color: const Color(0xFFFFD281),
+                      ),
+              fighter.hideStats
+                  ? _unknownStat(
+                      key: const ValueKey('incoming-unknown'),
+                      symbol: GameSymbol.incoming,
+                      label: 'Потеряет HP',
+                      color: const Color(0xFFFF946E),
+                    )
+                  : AnimatedStat(
                 key: const ValueKey('incoming'),
                 symbol: GameSymbol.incoming,
                 value: preview.incomingDamage,
+                valueText: _damageText(
+                  preview.incomingDamage,
+                  preview.incomingDamagePerHit,
+                  preview.incomingHits,
+                ),
                 label: 'Потеряет HP',
                 color: const Color(0xFFFF946E),
               ),
-              _shieldStat(side: side, value: preview.shield),
-              AnimatedStat(
+              fighter.hideStats
+                  ? _unknownStat(
+                      key: const ValueKey('shield-unknown'),
+                      symbol: GameSymbol.shield,
+                      label: 'Доступный щит',
+                      color: const Color(0xFF8BC8FF),
+                    )
+                  : _shieldStat(side: side, value: preview.availableShield),
+              fighter.hideStats
+                  ? _unknownStat(
+                      key: const ValueKey('heal-unknown'),
+                      symbol: GameSymbol.heal,
+                      label: 'Вылечит в конце',
+                      color: const Color(0xFF70DC9C),
+                    )
+                  : AnimatedStat(
                 key: const ValueKey('heal'),
                 symbol: GameSymbol.heal,
                 value: preview.healing,
                 label: 'Вылечит в конце',
                 color: const Color(0xFF70DC9C),
               ),
-              AnimatedStat(
+              fighter.hideStats
+                  ? _unknownStat(
+                      key: const ValueKey('fire-unknown'),
+                      symbol: GameSymbol.fire,
+                      label: 'Наложит горение',
+                      color: const Color(0xFFFF885A),
+                    )
+                  : AnimatedStat(
                 key: const ValueKey('fire'),
                 symbol: GameSymbol.fire,
                 value: preview.burnApplied,
@@ -1276,6 +1505,57 @@ class _FighterPanelState extends State<_FighterPanel>
                   ),
                 ),
               ),
+              if (widget.loser)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: _defeat,
+                      builder: (context, child) {
+                        final progress = Curves.easeOutCubic.transform(
+                          _defeat.value,
+                        );
+                        return Opacity(
+                          opacity: progress,
+                          child: Center(
+                            child: Transform.scale(
+                              scale: reduced ? 1 : .86 + progress * .14,
+                              child: child,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Icon(
+                        Icons.close,
+                        size: widget.width * .72,
+                        color: const Color(0xFFE5394F),
+                        shadows: const [
+                          Shadow(color: Colors.black87, blurRadius: 5),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              if (widget.loser && widget.showMogged)
+                Positioned(
+                  top: -34,
+                  left: 0,
+                  right: 0,
+                  child: IgnorePointer(
+                    child: Text(
+                      'MOGGED',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: const Color(0xFFFF5368),
+                        fontSize: widget.width * .12,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.4,
+                        shadows: const [
+                          Shadow(color: Colors.black, blurRadius: 4),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               if (eventTargetsThisFighter &&
                   activeEvent != null &&
                   activeEvent.type != BattleEventType.attack &&
@@ -1320,7 +1600,8 @@ class _FighterPanelState extends State<_FighterPanel>
   }
 
   String _sourceEventLabel(BattleEvent event) => switch (event.type) {
-    BattleEventType.attack => 'Атака · ${event.amount}',
+    BattleEventType.attack =>
+      'Атака · ${_damageText(event.amount, event.amount, event.hits)}',
     BattleEventType.shield => 'Щит · +${event.amount}',
     BattleEventType.heal => 'Лечение · +${event.amount}',
     BattleEventType.burn => 'Горение · ${event.amount}',
@@ -1329,7 +1610,8 @@ class _FighterPanelState extends State<_FighterPanel>
   };
 
   String _eventLabel(BattleEvent event) => switch (event.type) {
-    BattleEventType.attack => 'Получает удар · ${event.amount}',
+    BattleEventType.attack =>
+      'Получает удар · ${_damageText(event.amount, event.amount, event.hits)}',
     BattleEventType.blocked => 'Щит поглотил · ${event.amount}',
     BattleEventType.damage => 'Урон · −${event.amount}',
     BattleEventType.burn => 'Горение · −${event.amount}',
@@ -1342,7 +1624,7 @@ class _FighterPanelState extends State<_FighterPanel>
       key: const ValueKey('shield'),
       symbol: GameSymbol.shield,
       value: value,
-      label: 'Щит на раунд',
+      label: 'Доступный щит',
       color: const Color(0xFF8BC8FF),
     );
     final event = widget.activeEvent;
@@ -1359,6 +1641,25 @@ class _FighterPanelState extends State<_FighterPanel>
       child: stat,
     );
   }
+
+  String _damageText(int total, int perHit, int hits) => hits > 1
+      ? '$perHit x$hits'
+      : '$total';
+
+  Widget _unknownStat({
+    required Key key,
+    required GameSymbol symbol,
+    required String label,
+    required Color color,
+  }) => AnimatedStat(
+    key: key,
+    symbol: symbol,
+    value: 1,
+    valueText: '?',
+    alwaysVisible: true,
+    label: label,
+    color: color,
+  );
 }
 
 class _KartoflaPortraitPainter extends CustomPainter {

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muhtar_minigame/domain/locations.dart';
@@ -9,6 +11,21 @@ import 'package:muhtar_minigame/game_logic/game_state.dart';
 import 'package:muhtar_minigame/game_logic/notification_service.dart';
 import 'package:muhtar_minigame/ui/battle/pre_battle_overlay.dart';
 import 'package:muhtar_minigame/ui/search/search_overlay.dart';
+
+class _FixedRandom implements Random {
+  const _FixedRandom(this.value);
+
+  final int value;
+
+  @override
+  bool nextBool() => value.isEven;
+
+  @override
+  double nextDouble() => value == 0 ? 0 : 0.5;
+
+  @override
+  int nextInt(int max) => value % max;
+}
 
 void main() {
   late GameState gameState;
@@ -125,7 +142,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Здесь ничего нет...'), findsOneWidget);
+    expect(find.text('Больше ничего нет'), findsOneWidget);
     expect(find.text('Тщательный поиск'), findsNothing);
     expect(find.text('Проверить объект'), findsNothing);
     expect(find.text('Находка обнаружена'), findsNothing);
@@ -133,6 +150,27 @@ void main() {
 
     await tester.tap(find.text('Закрыть'));
     expect(loaded.itemCount('sync_async'), itemCountBefore);
+  });
+
+  test('опустевший куст показывает нижнее уведомление без поиска', () {
+    gameState = GameState(random: const _FixedRandom(0));
+    game = MuhtarGame(
+      gameState: gameState,
+      notifications: NotificationService(),
+      audio: AudioService(),
+    );
+    registerStubOverlays();
+    final prop = Locations.forest.props.firstWhere(
+      (candidate) => candidate.searchable && candidate.specialItemId == null,
+    );
+
+    for (var tap = 0; tap < 10; tap++) {
+      gameState.searchProp(prop.id);
+    }
+    game.world_.onPropSearch!(prop);
+
+    expect(game.overlays.isActive(MuhtarGame.overlaySearch), isFalse);
+    expect(game.notifications.notifications.single.message, contains('ничего'));
   });
 
   testWidgets('картошка в поиске имеет собственное представление', (

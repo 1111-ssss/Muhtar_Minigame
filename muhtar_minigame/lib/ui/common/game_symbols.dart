@@ -128,6 +128,138 @@ Color diceColor(DiceAbility ability) => switch (ability) {
   DiceAbility.upgrade => const Color(0xFFF58CFF),
 };
 
+class RarityPalette {
+  const RarityPalette({
+    required this.background,
+    required this.foreground,
+    required this.border,
+  });
+
+  final Color background;
+  final Color foreground;
+  final Color border;
+}
+
+RarityPalette artifactRarityPalette(ArtifactRarity rarity) => switch (rarity) {
+  ArtifactRarity.common => const RarityPalette(
+    background: Color(0xFF294148),
+    foreground: Color(0xFFB7E8E0),
+    border: Color(0xFF5BA99D),
+  ),
+  ArtifactRarity.rare => const RarityPalette(
+    background: Color(0xFF2B4168),
+    foreground: Color(0xFFB8D5FF),
+    border: Color(0xFF6D9FE5),
+  ),
+  ArtifactRarity.epic => const RarityPalette(
+    background: Color(0xFF59366E),
+    foreground: Color(0xFFF0B9FF),
+    border: Color(0xFFC879DF),
+  ),
+  ArtifactRarity.veryRare => const RarityPalette(
+    background: Color(0xFF713B52),
+    foreground: Color(0xFFFFB4D2),
+    border: Color(0xFFE06D9A),
+  ),
+};
+
+RarityPalette diceRarityPalette(DiceRarity rarity) => switch (rarity) {
+  DiceRarity.common => const RarityPalette(
+    background: Color(0xFF33434A),
+    foreground: Color(0xFFC5D6D8),
+    border: Color(0xFF71949B),
+  ),
+  DiceRarity.rare => const RarityPalette(
+    background: Color(0xFF2C4C75),
+    foreground: Color(0xFFB9D9FF),
+    border: Color(0xFF6EA6E8),
+  ),
+  DiceRarity.epic => const RarityPalette(
+    background: Color(0xFF583773),
+    foreground: Color(0xFFF1C2FF),
+    border: Color(0xFFC783E0),
+  ),
+  DiceRarity.legendary => const RarityPalette(
+    background: Color(0xFF704B25),
+    foreground: Color(0xFFFFD993),
+    border: Color(0xFFE4A746),
+  ),
+};
+
+class DiceHoverCard extends StatelessWidget {
+  const DiceHoverCard({required this.dice, required this.child, super.key});
+
+  final Dice dice;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = diceRarityPalette(dice.rarity);
+    final modifiers = dice.activeModifiers;
+    return Tooltip(
+      richMessage: TextSpan(
+        children: [
+          TextSpan(
+            text: '${dice.name}\n',
+            style: TextStyle(
+              color: palette.foreground,
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+            ),
+          ),
+          TextSpan(
+            text: '${dice.rarity.title} · уровень ${dice.level}\n\n',
+            style: TextStyle(
+              color: palette.foreground.withValues(alpha: .9),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextSpan(
+            text: '${dice.ability.description}\n\n',
+            style: const TextStyle(color: Colors.white, height: 1.3),
+          ),
+          TextSpan(
+            text: 'Модификаторы\n',
+            style: TextStyle(
+              color: palette.foreground,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextSpan(
+            text: modifiers.isEmpty
+                ? 'Нет'
+                : modifiers
+                    .map(
+                      (modifier) =>
+                          '${modifier.title}: ${modifier.description}',
+                    )
+                    .join('\n'),
+            style: const TextStyle(color: Colors.white, height: 1.3),
+          ),
+        ],
+      ),
+      decoration: BoxDecoration(
+        color: palette.background,
+        border: Border.all(color: palette.border, width: 1.5),
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black54,
+            blurRadius: 14,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(12),
+      constraints: const BoxConstraints(maxWidth: 330),
+      preferBelow: false,
+      waitDuration: const Duration(milliseconds: 180),
+      showDuration: const Duration(seconds: 10),
+      child: child,
+    );
+  }
+}
+
 IconData artifactIcon(Artifact artifact) => switch (artifact) {
   Artifact.truceSeal => Icons.spa_outlined,
   Artifact.ironThread => Icons.shield_outlined,
@@ -149,51 +281,95 @@ class ArtifactBadge extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-    message:
-        '${artifact.title}${count > 1 ? ' ×$count' : ''}\n${artifact.description}',
-    waitDuration: const Duration(milliseconds: 150),
-    showDuration: const Duration(seconds: 8),
-    constraints: const BoxConstraints(maxWidth: 300),
-    child: Semantics(
-      label: '${artifact.title}, $count. ${artifact.description}',
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF4E3B62), Color(0xFF241C32)],
+  Widget build(BuildContext context) {
+    final palette = artifactRarityPalette(artifact.rarity);
+    return Tooltip(
+      richMessage: TextSpan(
+        children: [
+          TextSpan(
+            text: '${artifact.title}\n',
+            style: TextStyle(
+              color: palette.foreground,
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+            ),
           ),
-          border: Border.all(color: const Color(0xFFAE8DC6)),
-          borderRadius: BorderRadius.circular(6),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black45,
-              offset: Offset(2, 3),
-              blurRadius: 5,
+          TextSpan(
+            text:
+                '${artifact.rarity.title}${count > 1 ? ' · ×$count' : ''}\n\n',
+            style: TextStyle(
+              color: palette.foreground.withValues(alpha: .9),
+              fontWeight: FontWeight.bold,
             ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Center(
-              child: Icon(
-                artifactIcon(artifact),
-                size: size * .58,
-                color: const Color(0xFFE8C78B),
-              ),
+          ),
+          TextSpan(
+            text: artifact.description,
+            style: const TextStyle(color: Colors.white, height: 1.3),
+          ),
+        ],
+      ),
+      waitDuration: const Duration(milliseconds: 150),
+      showDuration: const Duration(seconds: 8),
+      padding: const EdgeInsets.all(12),
+      constraints: const BoxConstraints(maxWidth: 300),
+      preferBelow: false,
+      decoration: BoxDecoration(
+        color: palette.background,
+        border: Border.all(color: palette.border, width: 1.5),
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black54,
+            blurRadius: 14,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Semantics(
+        label:
+            '${artifact.title}, ${artifact.rarity.title}, $count. '
+            '${artifact.description}',
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                palette.background,
+                palette.background.withValues(alpha: .5),
+              ],
             ),
-            if (count > 1)
-              Positioned(
-                right: 2,
-                bottom: 0,
-                child: Text('$count', style: const TextStyle(fontSize: 11)),
+            border: Border.all(color: palette.border),
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black45,
+                offset: Offset(2, 3),
+                blurRadius: 5,
               ),
-          ],
+            ],
+          ),
+          child: Stack(
+            children: [
+              Center(
+                child: Icon(
+                  artifactIcon(artifact),
+                  size: size * .58,
+                  color: palette.foreground,
+                ),
+              ),
+              if (count > 1)
+                Positioned(
+                  right: 2,
+                  bottom: 0,
+                  child: Text('$count', style: const TextStyle(fontSize: 11)),
+                ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

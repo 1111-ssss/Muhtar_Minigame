@@ -22,6 +22,9 @@ const mapTileNames = <String>[
   'Песок',
   'Цветочный луг',
   'Гравий',
+  'Деревянный пол',
+  'Светлая плитка',
+  'Тёмная плитка',
 ];
 
 const mapTileColors = <Color>[
@@ -40,6 +43,9 @@ const mapTileColors = <Color>[
   Color(0xFFCCB880),
   Color(0xFF71985A),
   Color(0xFF8A8578),
+  Color(0xFF9B6B45),
+  Color(0xFFC8CDD2),
+  Color(0xFF59616B),
 ];
 
 int mapEditorTileAt(BuildMapDocument map, int col, int row) =>
@@ -59,6 +65,9 @@ bool mapCellBlocked(BuildMapDocument map, int col, int row) {
     12,
     13,
     14,
+    15,
+    16,
+    17,
   }.contains(mapEditorTileAt(map, col, row))) {
     return true;
   }
@@ -427,7 +436,7 @@ class _MapPainter extends CustomPainter {
         canvas.drawPath(path, fill);
         if (grid) canvas.drawPath(path, line);
         if (collision &&
-            (!const {0, 2, 4, 8, 9, 10, 11, 12, 13, 14}.contains(tile) ||
+        (!const {0, 2, 4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}.contains(tile) ||
                 blocked.contains((c, r)))) {
           canvas.drawPath(path, Paint()..color = const Color(0x88C7354D));
           final center = geometry.point(c + .5, r + .5);

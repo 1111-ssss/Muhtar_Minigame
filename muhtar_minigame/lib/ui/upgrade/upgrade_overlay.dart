@@ -4,9 +4,11 @@ import '../../domain/artifact.dart';
 import '../../domain/dice.dart';
 import '../../domain/game_content.dart';
 import '../../domain/quest.dart';
+import '../../domain/player_skin.dart';
 import '../../domain/shop_item.dart';
 import '../../game/muhtar_game.dart';
 import '../../game_logic/game_state.dart';
+import '../../game_logic/notification_service.dart';
 import '../battle/dice_visual.dart';
 import '../common/animated_overlay.dart';
 import '../common/game_symbols.dart';
@@ -31,20 +33,27 @@ class UpgradeOverlay extends StatefulWidget {
 class _UpgradeOverlayState extends State<UpgradeOverlay> {
   bool _opening = false;
   bool _mergeMode = false;
+  _InventoryTab _inventoryTab = _InventoryTab.items;
   final Set<int> _selectedDice = <int>{};
 
   Future<void> _open(CaseType type) async {
     if (_opening) return;
     final state = widget.game.gameState;
-    final dice = type == CaseType.dice ? state.openDiceCase() : null;
+    final dice = type == CaseType.dice
+        ? state.beginDiceBoxOpening()
+        : null;
     final choices = type == CaseType.artifact
-        ? state.openArtifactCase()
+        ? state.openArtifactBox()
         : <Artifact>[];
-    if (dice == null && choices.isEmpty) return;
+    if (dice == null &&
+        choices.isEmpty &&
+        !state.hasPendingModifierChoice) {
+      return;
+    }
     setState(() => _opening = true);
     widget.game.modalDialogOpen = true;
     try {
-      // Сначала фиксируем результат. Перезапуск не даёт новый бросок кейса.
+      // Сначала фиксируем результат. Перезапуск не даёт новый бросок ящика.
       await widget.game.saveProgress();
       if (!mounted) return;
       if (dice != null) {
@@ -53,14 +62,26 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
           barrierDismissible: false,
           builder: (_) => DiceCaseDialog(result: dice),
         );
+        if (state.claimPendingDiceReward()) {
+          await widget.game.saveProgress();
+        }
       } else {
-        final chosen = await showDialog<Artifact>(
+        if (state.pendingModifier != null) {
+          await _applyPendingModifier(state, showRoll: false);
+          return;
+        }
+        final chosen = await showDialog<Object>(
           context: context,
           barrierDismissible: false,
-          builder: (_) => ArtifactCaseDialog(choices: choices),
+          builder: (_) => ArtifactCaseDialog(
+            choices: choices,
+            showModifier: state.hasPendingModifierChoice,
+          ),
         );
-        if (chosen != null && state.chooseArtifact(chosen)) {
+        if (chosen is Artifact && state.chooseArtifact(chosen)) {
           await widget.game.saveProgress();
+        } else if (chosen == ArtifactBoxChoice.modifier) {
+          await _applyPendingModifier(state);
         }
       }
     } finally {
@@ -69,8 +90,42 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
     }
   }
 
+  Future<void> _applyPendingModifier(
+    GameState state, {
+    bool showRoll = true,
+  }) async {
+    final modifier = state.rollModifier();
+    if (modifier == null) return;
+    await widget.game.saveProgress();
+    if (showRoll) {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ModifierRollDialog(result: modifier),
+      );
+    }
+    if (!mounted) return;
+    final target = await showDialog<int>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => DiceModifierTargetDialog(
+        dice: state.inventory,
+        modifier: modifier,
+      ),
+    );
+    if (target != null && state.applyPendingModifier(target)) {
+      await widget.game.saveProgress();
+    }
+  }
+
   void _purchase(String itemId) {
     final purchased = widget.game.gameState.buyShopItem(itemId);
+    if (purchased && itemId == 'doctor_pepper') {
+      widget.game.notifications.notify(
+        'Доктор Пеппер оказался невкусным и отнял 5 HP.',
+        type: NotificationType.warning,
+      );
+    }
     if (purchased && itemId == 'shaurma') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) widget.game.openShawarmaChoice();
@@ -89,6 +144,16 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
     });
   }
 
+  void _changeInventoryTab(_InventoryTab tab) {
+    setState(() {
+      _inventoryTab = tab;
+      if (tab == _InventoryTab.skins) {
+        _mergeMode = false;
+        _selectedDice.clear();
+      }
+    });
+  }
+
   bool _canMergeIndex(List<Dice> dice, int index) {
     final candidate = dice[index];
     return candidate.canUpgrade &&
@@ -96,7 +161,9 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
           (entry) =>
               entry.key != index &&
               entry.value.ability == candidate.ability &&
-              entry.value.level == candidate.level,
+              entry.value.level == candidate.level &&
+              entry.value.activeModifiers.length == candidate.activeModifiers.length &&
+              entry.value.activeModifiers.containsAll(candidate.activeModifiers),
         );
   }
 
@@ -110,7 +177,9 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
         indexes.removeWhere(
           (index) =>
               dice[index].ability != selected.ability ||
-              dice[index].level != selected.level,
+              dice[index].level != selected.level ||
+              dice[index].activeModifiers.length != selected.activeModifiers.length ||
+              !dice[index].activeModifiers.containsAll(selected.activeModifiers),
         );
       }
     }
@@ -131,7 +200,10 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
     if (_selectedDice.length == 1) {
       final first = state.inventory[_selectedDice.first];
       final second = state.inventory[index];
-      if (first.ability != second.ability || first.level != second.level) {
+      if (first.ability != second.ability ||
+          first.level != second.level ||
+          first.activeModifiers.length != second.activeModifiers.length ||
+          !first.activeModifiers.containsAll(second.activeModifiers)) {
         return;
       }
     }
@@ -162,6 +234,47 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
       listenable: widget.game.gameState,
       builder: (context, _) {
         final state = widget.game.gameState;
+        if (widget.shop) {
+          return Scaffold(
+            backgroundColor: const Color(0xFF141720),
+            appBar: AppBar(
+              backgroundColor: const Color(0xFF202332),
+              title: Text(
+                switch (widget.shopNpcId) {
+                  'baba_galya' => 'Магазин Бабы Гали',
+                  'alenka' => 'Копеечка · магазин',
+                  'shaurmek' => 'Донер · магазин Шаурмека',
+                  _ => 'Магазин Арианы',
+                },
+              ),
+              leading: IconButton(
+                tooltip: 'Закрыть',
+                onPressed: close,
+                icon: const Icon(Icons.close),
+              ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Center(child: Text('${state.coins} монет')),
+                ),
+              ],
+            ),
+            body: SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+                children: [
+                  _Section('Товары'),
+                  _ShopGrid(
+                    state: state,
+                    npcId: widget.shopNpcId ?? 'ariana',
+                    onPurchase: _purchase,
+                    onUpgrade: _purchaseUpgrade,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
         final visibleDice = _visibleDice(state);
         return Scaffold(
           backgroundColor: const Color(0xFF141720),
@@ -211,16 +324,14 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
                       ),
                       const SizedBox(height: 8),
                     ],
-                    _SkinSelectionPanel(
-                      state: state,
-                      onSelect: (skinId) => _selectSkin(state, skinId),
-                    ),
-                    const SizedBox(height: 8),
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final wide = constraints.maxWidth >= 760;
                         final inventory = _InventoryPanel(
                           state: state,
+                          tab: _inventoryTab,
+                          onTabChanged: _changeInventoryTab,
+                          onSelectSkin: (skinId) => _selectSkin(state, skinId),
                           mergeMode: _mergeMode,
                           selectedDice: _selectedDice,
                           visibleDice: visibleDice,
@@ -238,6 +349,9 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
                                 selectedDice: _selectedDice.toList(),
                               )
                             : _ArtifactPanel(state: state);
+                        if (_inventoryTab == _InventoryTab.skins) {
+                          return inventory;
+                        }
                         if (wide) {
                           return Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -280,119 +394,59 @@ class _UpgradeOverlayState extends State<UpgradeOverlay> {
   }
 }
 
-/// Временной адаптер для API скинов. Он намеренно живёт в UI: пока GameState
-/// ещё не содержит эти поля, старые сохранения и старые тестовые состояния
-/// продолжают открывать инвентарь, а будущий API подключается без миграции
-/// конструкторов оверлея.
-dynamic _tryRead(dynamic Function() read) {
-  try {
-    return read();
-  } catch (_) {
-    return null;
-  }
-}
-
-List<String> _skinIds(dynamic value) {
-  if (value is! Iterable) return const [];
-  return value
-      .map((item) => _skinValue(item, 'id') ?? item.toString())
-      .where((id) => id.isNotEmpty)
-      .toSet()
-      .toList(growable: false);
-}
-
-String? _skinValue(dynamic skin, String key) {
-  if (skin is String) return key == 'id' ? skin : null;
-  if (skin is Map) return skin[key]?.toString();
-  final value = _tryRead(() {
-    final dynamic object = skin;
-    return switch (key) {
-      'id' => object.id,
-      'name' => object.name,
-      'description' => object.description,
-      _ => null,
-    };
-  });
-  return value?.toString();
-}
-
-class _SkinSelectionPanel extends StatelessWidget {
-  const _SkinSelectionPanel({required this.state, required this.onSelect});
+class _SkinSelectionContent extends StatelessWidget {
+  const _SkinSelectionContent({required this.state, required this.onSelect});
 
   final GameState state;
   final Future<void> Function(String skinId) onSelect;
 
   @override
   Widget build(BuildContext context) {
-    final dynamic dynamicState = state;
-    final availableValue = _tryRead(() => dynamicState.availableSkins);
-    final available = availableValue is Iterable
-        ? availableValue.toList(growable: false)
-        : GameContent.skinCatalog;
-    final owned = _skinIds(_tryRead(() => dynamicState.ownedSkinIds));
-    final selected = _tryRead(() => dynamicState.selectedSkinId)?.toString();
+    final owned = state.ownedSkinIds;
+    final selected = state.selectedSkinId;
 
-    return _Panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _PanelTitle('Образ героя', Icons.palette_outlined),
-          const SizedBox(height: 6),
-          const Text(
-            'Выберите открытый скин для героя на карте.',
-            style: TextStyle(color: Colors.white70),
-          ),
-          const SizedBox(height: 14),
-          if (available.isEmpty)
-            const Text(
-              'Скины появятся после подключения каталога образов.',
-              style: TextStyle(color: Colors.white54),
-            )
-          else
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (final skin in available)
-                  _SkinTile(
-                    id: _skinValue(skin, 'id') ?? skin.toString(),
-                    title: _skinValue(skin, 'name') ?? 'Скин',
-                    description: _skinValue(skin, 'description'),
-                    owned: owned.contains(
-                      _skinValue(skin, 'id') ?? skin.toString(),
-                    ),
-                    selected:
-                        selected == (_skinValue(skin, 'id') ?? skin.toString()),
-                    onSelect: onSelect,
-                  ),
-              ],
-            ),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Выберите открытый образ. Картинка героя видна сразу.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            for (final skin in GameContent.skinCatalog)
+              _SkinTile(
+                skin: skin,
+                owned: owned.contains(skin.id),
+                selected: selected == skin.id,
+                onSelect: onSelect,
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
 
 class _SkinTile extends StatelessWidget {
   const _SkinTile({
-    required this.id,
-    required this.title,
-    required this.description,
+    required this.skin,
     required this.owned,
     required this.selected,
     required this.onSelect,
   });
 
-  final String id;
-  final String title;
-  final String? description;
+  final PlayerSkin skin;
   final bool owned;
   final bool selected;
   final Future<void> Function(String skinId) onSelect;
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: 220,
+    width: 250,
     child: Card(
       color: selected ? const Color(0xFF263F48) : const Color(0xFF242737),
       child: Padding(
@@ -400,6 +454,35 @@ class _SkinTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                key: ValueKey('skin-image-${skin.id}'),
+                height: 150,
+                width: double.infinity,
+                child: Image.asset(
+                  'assets/portraits/${skin.portraitKey}.png',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => DecoratedBox(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF3B4654), Color(0xFF1B202B)],
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        owned ? Icons.person : Icons.lock_outline,
+                        size: 58,
+                        color: owned
+                            ? const Color(0xFFFFD58E)
+                            : Colors.white38,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Icon(
@@ -411,7 +494,7 @@ class _SkinTile extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    title,
+                    skin.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.bold),
@@ -419,19 +502,10 @@ class _SkinTile extends StatelessWidget {
                 ),
               ],
             ),
-            if (description != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                description!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white60, fontSize: 12),
-              ),
-            ],
             const SizedBox(height: 10),
             FilledButton(
-              key: ValueKey('skin-select-$id'),
-              onPressed: owned && !selected ? () => onSelect(id) : null,
+              key: ValueKey('skin-select-${skin.id}'),
+              onPressed: owned && !selected ? () => onSelect(skin.id) : null,
               child: Text(
                 selected
                     ? 'Выбран'
@@ -568,12 +642,12 @@ class _ShopGrid extends StatelessWidget {
         physics: const NeverScrollableScrollPhysics(),
         children: [
           _Purchase(
-            title: 'Кейс кости',
-            description: 'Случайная способность и уровень.',
+            title: 'Ящик костей',
+            description: 'Случайный тип и уровень 1–3.',
             icon: Icons.inventory_2_outlined,
             price: GameState.caseCost,
             onBuy: state.coins >= GameState.caseCost
-                ? () => onUpgrade(state.buyCase)
+                ? () => onUpgrade(state.buyDiceBox)
                 : null,
           ),
           _Purchase(
@@ -607,9 +681,14 @@ class _ShopGrid extends StatelessWidget {
   );
 }
 
+enum _InventoryTab { items, skins }
+
 class _InventoryPanel extends StatelessWidget {
   const _InventoryPanel({
     required this.state,
+    required this.tab,
+    required this.onTabChanged,
+    required this.onSelectSkin,
     required this.mergeMode,
     required this.selectedDice,
     required this.visibleDice,
@@ -621,6 +700,9 @@ class _InventoryPanel extends StatelessWidget {
   });
 
   final GameState state;
+  final _InventoryTab tab;
+  final ValueChanged<_InventoryTab> onTabChanged;
+  final Future<void> Function(String skinId) onSelectSkin;
   final bool mergeMode;
   final Set<int> selectedDice;
   final List<int> visibleDice;
@@ -632,6 +714,18 @@ class _InventoryPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (tab == _InventoryTab.skins) {
+      return _Panel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 14),
+            _SkinSelectionContent(state: state, onSelect: onSelectSkin),
+          ],
+        ),
+      );
+    }
     final itemEntries = state.items.entries.toList(growable: false);
     final itemCount = mergeMode
         ? visibleDice.length
@@ -640,47 +734,12 @@ class _InventoryPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Expanded(child: _PanelTitle('Инвентарь', Icons.backpack)),
-              if (mergeMode)
-                IconButton(
-                  tooltip: 'Выйти из режима объединения',
-                  onPressed: onExitMerge,
-                  icon: const Icon(Icons.close),
-                ),
-              FilledButton.icon(
-                onPressed: mergeMode && selectedDice.length == 2
-                    ? onMergePressed
-                    : mergeMode
-                    ? null
-                    : onMergePressed,
-                style: FilledButton.styleFrom(
-                  backgroundColor: mergeMode
-                      ? const Color(0xFF7658E8)
-                      : const Color(0xFF343A52),
-                  foregroundColor: Colors.white,
-                  side: mergeMode
-                      ? const BorderSide(color: Color(0xFFB9A9FF), width: 2)
-                      : null,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                ),
-                icon: Icon(mergeMode ? Icons.auto_awesome : Icons.merge_type),
-                label: Text(
-                  mergeMode
-                      ? selectedDice.length == 2
-                            ? 'Объединить · 2'
-                            : 'Объединение · ${selectedDice.length}/2'
-                      : 'Объединить',
-                ),
-              ),
-            ],
-          ),
+          _buildHeader(),
           const SizedBox(height: 6),
           Text(
             mergeMode
                 ? 'Выберите две одинаковые кости. Совместимые варианты подсвечены.'
-                : 'Кейсы отображаются первыми, затем предметы и кости — '
+                : 'Ящики отображаются первыми, затем предметы и кости — '
                       'от высокого уровня к низкому.',
             style: const TextStyle(color: Colors.white70, height: 1.35),
           ),
@@ -705,10 +764,12 @@ class _InventoryPanel extends StatelessWidget {
                 if (!mergeMode && item < CaseType.values.length) {
                   return _CaseTile(
                     type: CaseType.values[item],
-                    count: state.caseCount(CaseType.values[item]),
+                    count: state.boxCount(CaseType.values[item]),
                     pending:
-                        CaseType.values[item] == CaseType.artifact &&
-                        state.pendingArtifactChoices.isNotEmpty,
+                        CaseType.values[item] == CaseType.dice
+                            ? state.pendingDiceReward != null
+                            : state.pendingArtifactChoices.isNotEmpty ||
+                                state.hasPendingModifierChoice,
                     disabled: opening,
                     onOpen: () => onOpenCase(CaseType.values[item]),
                   );
@@ -738,6 +799,104 @@ class _InventoryPanel extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildHeader() => Column(
+    children: [
+      Row(
+        children: [
+          const Expanded(child: _PanelTitle('Инвентарь', Icons.backpack)),
+          if (tab == _InventoryTab.items && mergeMode)
+            IconButton(
+              tooltip: 'Выйти из режима объединения',
+              onPressed: onExitMerge,
+              icon: const Icon(Icons.close),
+            ),
+          if (tab == _InventoryTab.items)
+            FilledButton.icon(
+              onPressed: mergeMode && selectedDice.length == 2
+                  ? onMergePressed
+                  : mergeMode
+                  ? null
+                  : onMergePressed,
+              style: FilledButton.styleFrom(
+                backgroundColor: mergeMode
+                    ? const Color(0xFF7658E8)
+                    : const Color(0xFF343A52),
+                foregroundColor: Colors.white,
+                side: mergeMode
+                    ? const BorderSide(color: Color(0xFFB9A9FF), width: 2)
+                    : null,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              icon: Icon(mergeMode ? Icons.auto_awesome : Icons.merge_type),
+              label: Text(
+                mergeMode
+                    ? selectedDice.length == 2
+                          ? 'Объединить · 2'
+                          : 'Объединение · ${selectedDice.length}/2'
+                    : 'Объединить',
+              ),
+            ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      Center(
+        child: DecoratedBox(
+          key: const ValueKey('inventory-tabs'),
+          decoration: BoxDecoration(
+            color: const Color(0xFF171A25),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF4A506D)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _InventoryTabButton(
+                label: 'Предметы',
+                icon: Icons.backpack_outlined,
+                selected: tab == _InventoryTab.items,
+                onPressed: () => onTabChanged(_InventoryTab.items),
+              ),
+              _InventoryTabButton(
+                label: 'Скины',
+                icon: Icons.palette_outlined,
+                selected: tab == _InventoryTab.skins,
+                onPressed: () => onTabChanged(_InventoryTab.skins),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class _InventoryTabButton extends StatelessWidget {
+  const _InventoryTabButton({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => TextButton.icon(
+    onPressed: selected ? null : onPressed,
+    style: TextButton.styleFrom(
+      backgroundColor: selected ? const Color(0xFF3C4261) : Colors.transparent,
+      foregroundColor: selected ? const Color(0xFF9BFFE5) : Colors.white70,
+      disabledForegroundColor: const Color(0xFF9BFFE5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+    ),
+    icon: Icon(icon, size: 17),
+    label: Text(label),
+  );
 }
 
 class _ShopItemPurchase extends StatelessWidget {
@@ -928,11 +1087,18 @@ class _DiceInventoryTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    button: mergeMode,
-    selected: selected,
-    label: '${dice.name}, уровень ${dice.level}',
-    child: Material(
+  Widget build(BuildContext context) {
+    final palette = diceRarityPalette(dice.rarity);
+    final modifiers = dice.activeModifiers;
+    return DiceHoverCard(
+      dice: dice,
+      child: Semantics(
+        button: mergeMode,
+        selected: selected,
+        label:
+            '${dice.name}, ${dice.rarity.title}, уровень ${dice.level}, '
+            '${modifiers.isEmpty ? 'без модификаторов' : modifiers.map((m) => m.title).join(', ')}',
+        child: Material(
       color: Colors.transparent,
       child: InkWell(
         key: ValueKey('inventory-dice-$index'),
@@ -941,12 +1107,12 @@ class _DiceInventoryTile extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF242737),
+            color: palette.background,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected
                   ? const Color(0xFF78F3D0)
-                  : const Color(0xFF4A506D),
+                  : palette.border,
               width: selected ? 3 : 1,
             ),
             boxShadow: selected
@@ -974,31 +1140,48 @@ class _DiceInventoryTile extends StatelessWidget {
                     dice: dice,
                     compact: true,
                     selected: selected,
+                    showLevel: true,
                   ),
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                dice.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(
-                'Уровень ${dice.level}',
-                style: TextStyle(
-                  color: selected
-                      ? const Color(0xFF78F3D0)
-                      : const Color(0xFFFFD58E),
-                  fontSize: 12,
+              if (modifiers.isNotEmpty)
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 4,
+                  runSpacing: 3,
+                  children: [
+                    for (final modifier in modifiers)
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: palette.foreground.withValues(alpha: .16),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
+                          child: Text(
+                            modifier.title,
+                            style: TextStyle(
+                              color: palette.foreground,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
             ],
           ),
         ),
       ),
-    ),
-  );
+        ),
+      ),
+    );
+  }
 }
 
 class _ItemInventoryTile extends StatelessWidget {
@@ -1012,6 +1195,7 @@ class _ItemInventoryTile extends StatelessWidget {
     'sync_async' => 'SyncAsync',
     'alpen_gold' => 'Альпен Гольд',
     'shaurma' => 'Шаурма',
+    'insulin_syringe' => 'Шиприц инсулина',
     _ => itemId,
   };
 
@@ -1020,6 +1204,7 @@ class _ItemInventoryTile extends StatelessWidget {
     'sync_async' => 'Найденный предмет',
     'alpen_gold' => 'Предмет для задания',
     'shaurma' => 'Предмет для задания',
+    'insulin_syringe' => 'Странная находка с моста',
     _ => 'Предмет',
   };
 
@@ -1096,53 +1281,29 @@ class _ArtifactPanel extends StatelessWidget {
         const _PanelTitle('Артефакты', Icons.auto_awesome),
         const SizedBox(height: 6),
         const Text(
-          'Пассивные эффекты героя и их количество.',
+          'Наведите курсор на изображение, чтобы открыть название, редкость '
+          'и описание.',
           style: TextStyle(color: Colors.white70),
         ),
         const SizedBox(height: 14),
         if (state.artifacts.isEmpty)
           const Text(
-            'Кейсы артефактов выдаются за задания.',
+            'Ящики артефактов выдаются за задания.',
             style: TextStyle(color: Colors.white54),
           )
         else
-          for (final entry in state.artifacts.entries)
-            Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF242737),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF56466B)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ArtifactBadge(entry.key, count: entry.value, size: 50),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${entry.key.title} ×${entry.value}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          entry.key.description,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                            height: 1.3,
-                          ),
-                        ),
-                      ],
-                    ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final entry in state.artifacts.entries)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: ArtifactBadge(entry.key, count: entry.value, size: 58),
                   ),
-                ],
-              ),
+              ],
             ),
+          ),
       ],
     ),
   );

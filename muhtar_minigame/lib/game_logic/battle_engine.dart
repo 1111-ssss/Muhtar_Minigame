@@ -18,12 +18,14 @@ class RolledDie {
 class TurnEffects {
   const TurnEffects({
     this.attack = 0,
+    this.attackHits = 1,
     this.shield = 0,
     this.heal = 0,
     this.burn = 0,
   });
 
   final int attack;
+  final int attackHits;
   final int shield;
   final int heal;
   final int burn;
@@ -33,15 +35,24 @@ class TurnEffects {
 class BattlePreview {
   const BattlePreview({
     this.outgoingDamage = 0,
+    this.outgoingDamagePerHit = 0,
+    this.outgoingHits = 0,
     this.incomingDamage = 0,
+    this.incomingDamagePerHit = 0,
+    this.incomingHits = 0,
     this.shield = 0,
+    this.availableShield = 0,
     this.blockedDamage = 0,
     this.healing = 0,
     this.burnApplied = 0,
   });
 
   final int outgoingDamage;
+  final int outgoingDamagePerHit;
+  final int outgoingHits;
   final int incomingDamage;
+  final int incomingDamagePerHit;
+  final int incomingHits;
 
   /// Полный щит, который будет добавлен в начале этого раунда.
   ///
@@ -49,6 +60,9 @@ class BattlePreview {
   /// сколько фактического входящего урона поглотит щит и потому может быть
   /// меньше полного значения щита.
   final int shield;
+
+  /// Щит, который будет доступен после добавления нового щита этого раунда.
+  final int availableShield;
   final int blockedDamage;
   final int healing;
   final int burnApplied;
@@ -67,6 +81,7 @@ class BattleEvent {
     required this.source,
     required this.target,
     required this.amount,
+    this.hits = 1,
   });
 
   final int sequence;
@@ -74,6 +89,7 @@ class BattleEvent {
   final BattleEventType type;
   final BattleSide target;
   final int amount;
+  final int hits;
 }
 
 enum BattleSide { player, enemy }
@@ -87,8 +103,11 @@ class Fighter {
     int? initialHp,
     this.attackFaces = const [],
     this.baseAttack = 0,
+    int attackHits = 1,
     this.baseShield = 0,
     this.baseHealing = 0,
+    this.healingChance = 1,
+    this.hideStats = false,
     this.actsFirst = false,
     this.burnDamage = 0,
     this.appearance = 'player',
@@ -98,7 +117,8 @@ class Fighter {
     int rootCells = 0,
   }) : hp = (initialHp ?? maxHp).clamp(0, maxHp).toInt(),
        shield = initialShield,
-       rootCells = rootCells.clamp(0, 9).toInt();
+       rootCells = rootCells.clamp(0, 9).toInt(),
+       attackHits = attackHits.clamp(1, 99).toInt();
 
   final String name;
   final int maxHp;
@@ -106,8 +126,11 @@ class Fighter {
   final bool isPlayer;
   final List<int> attackFaces;
   final int baseAttack;
+  final int attackHits;
   final int baseShield;
   final int baseHealing;
+  final double healingChance;
+  final bool hideStats;
   final bool actsFirst;
   final int burnDamage;
   final String appearance;
@@ -131,14 +154,17 @@ class BattleEngine extends ChangeNotifier {
     int playerDiceCount = 1,
     int playerRerollsPerRound = 1,
     Map<Artifact, int> artifacts = const {},
+    this.onDiceConsumed,
+    this.onDiceChanged,
     Random? random,
   }) : hotbarSize = playerDiceCount.clamp(1, 3).toInt(),
        rerollsPerRound =
-           (playerRerollsPerRound + (artifacts[Artifact.luckyCharm] ?? 0))
-               .clamp(0, 6)
-               .toInt(),
-       artifacts = Map.unmodifiable(artifacts),
-       _random = random ?? Random() {
+            (playerRerollsPerRound +
+                    _normalizedArtifactCount(artifacts, Artifact.luckyCharm))
+                .clamp(0, 6)
+                .toInt(),
+        artifacts = Map.unmodifiable(_normalizeArtifacts(artifacts)),
+        _random = random ?? Random() {
     _hotbar = List.filled(hotbarSize, null);
   }
 
@@ -151,24 +177,51 @@ class BattleEngine extends ChangeNotifier {
   int lastEnemyDamage = 0;
   final int hotbarSize;
   final int rerollsPerRound;
+  final void Function(Dice dice)? onDiceConsumed;
+  final void Function(Dice before, Dice? after)? onDiceChanged;
   final Random _random;
   late final List<RolledDie?> _hotbar;
   final List<RolledDie?> _board = List.filled(9, null);
+  final List<MapEntry<int, RolledDie>> _glassDice = [];
   final Set<int> _rootedCells = <int>{};
+  final Set<int> _cancelledCells = <int>{};
   final Map<String, int> _legacyAssignments = {};
   List<BattleEvent> lastEvents = const [];
   List<RolledDie?> get hotbar => List.unmodifiable(_hotbar);
   List<RolledDie?> get board => List.unmodifiable(_board);
   Set<int> get rootedCells => Set.unmodifiable(_rootedCells);
+  Set<int> get cancelledCells => Set.unmodifiable(_cancelledCells);
+  bool get healingDieDrawn => _healingDieDrawn;
+
+  static int _normalizedArtifactCount(
+    Map<Artifact, int> artifacts,
+    Artifact artifact,
+  ) {
+    final count = artifacts[artifact] ?? 0;
+    return count <= 0 ? 0 : artifact.stackable ? count : 1;
+  }
+
+  static Map<Artifact, int> _normalizeArtifacts(
+    Map<Artifact, int> artifacts,
+  ) => {
+    for (final entry in artifacts.entries)
+      if (entry.value > 0)
+        entry.key: _normalizedArtifactCount(artifacts, entry.key),
+  };
 
   bool isCellRooted(int cell) => _rootedCells.contains(cell);
+  bool isCellCancelled(int cell) => _cancelledCells.contains(cell);
 
   TurnEffects _enemyIntent = const TurnEffects();
   TurnEffects get enemyIntent => _enemyIntent;
   int round = 1;
   int rerollsRemaining = 0;
+  static const int maxEnergy = 2;
+  int energy = 0;
+  bool _healingDieDrawn = false;
   bool _started = false;
   bool _over = false;
+  bool _rootResolutionPrepared = false;
   bool get isOver => _over;
   bool get canAct => _started && !_over;
   bool get isPlayerTurn => true;
@@ -190,29 +243,55 @@ class BattleEngine extends ChangeNotifier {
     notifyListeners();
   }
 
-  RolledDie _drawDie() {
-    final die = player.dice[_random.nextInt(player.dice.length)];
-    final minimum = die.level.clamp(1, 6).toInt();
-    return RolledDie(dice: die, value: minimum + _random.nextInt(7 - minimum));
+  RolledDie? _drawDie({Iterable<RolledDie?> excluded = const []}) {
+    final excludedIds = {
+      for (final die in excluded)
+        if (die != null) die.dice.id,
+    };
+    final candidates = _availableDice
+        .where((die) => !excludedIds.contains(die.id))
+        .toList();
+    if (candidates.isEmpty) return null;
+    final die = candidates[_random.nextInt(candidates.length)];
+    if (die.ability == DiceAbility.doctor) _healingDieDrawn = true;
+    return _rollDie(die);
   }
 
+  RolledDie _rollDie(Dice die) {
+    final faces = die.rollFaces;
+    return RolledDie(
+      dice: die,
+      value: faces[_random.nextInt(faces.length)],
+    );
+  }
+
+  List<Dice> get _availableDice => [
+    for (final dice in player.dice)
+      if ((!_healingDieDrawn || dice.ability != DiceAbility.doctor) &&
+          !_board.any((rolled) => identical(rolled?.dice, dice)))
+        dice,
+  ];
+
   void _prepareRound() {
-    _chooseRootedCells();
-    final drawnSources = <String>{};
+    // Энергия не накапливается: каждый новый раунд начинается ровно с двух.
+    energy = maxEnergy;
+    _rootedCells.clear();
+    _cancelledCells.clear();
+    _rootResolutionPrepared = false;
+    final drawnSources = <String>{
+      for (final die in _hotbar)
+        if (die != null) die.dice.id,
+    };
     for (var index = 0; index < hotbarSize; index++) {
-      if (_hotbar[index] == null && player.dice.isNotEmpty) {
-        final candidates = player.dice
+      if (_hotbar[index] == null && _availableDice.isNotEmpty) {
+        final candidates = _availableDice
             .where((dice) => !drawnSources.contains(dice.id))
             .toList();
-        final source = candidates.isEmpty
-            ? player.dice[_random.nextInt(player.dice.length)]
-            : candidates[_random.nextInt(candidates.length)];
+        if (candidates.isEmpty) break;
+        final source = candidates[_random.nextInt(candidates.length)];
         drawnSources.add(source.id);
-        final minimum = source.level.clamp(1, 6).toInt();
-        _hotbar[index] = RolledDie(
-          dice: source,
-          value: minimum + _random.nextInt(7 - minimum),
-        );
+        if (source.ability == DiceAbility.doctor) _healingDieDrawn = true;
+        _hotbar[index] = _rollDie(source);
       }
     }
     rerollsRemaining = rerollsPerRound;
@@ -220,12 +299,33 @@ class BattleEngine extends ChangeNotifier {
       attack: enemy.attackFaces.isEmpty
           ? enemy.baseAttack
           : enemy.attackFaces[_random.nextInt(enemy.attackFaces.length)],
+      attackHits: enemy.attackHits,
       shield: enemy.baseShield,
-      heal: enemy.baseHealing,
+      heal: enemy.baseHealing > 0 &&
+              _random.nextDouble() < enemy.healingChance
+          ? enemy.baseHealing
+          : 0,
       burn: enemy.burnDamage,
     );
     enemy.attackPhrase = _attackPhraseForRound();
     player.attackPhrase = _playerAttackPhraseForRound();
+  }
+
+  /// Chooses Victor's cells after the player has finished placing dice.
+  ///
+  /// The selection deliberately samples the whole board, including occupied
+  /// cells. Occupied cells are remembered separately so the UI can show the
+  /// cancelled dice during the root animation while [playerIntent] excludes
+  /// them from the round's resolution.
+  Set<int> prepareEndTurn() {
+    if (!canAct || _rootResolutionPrepared) return rootedCells;
+    _chooseRootedCells();
+    _cancelledCells.addAll(
+      _rootedCells.where((cell) => _board[cell] != null),
+    );
+    _rootResolutionPrepared = true;
+    notifyListeners();
+    return rootedCells;
   }
 
   void _chooseRootedCells() {
@@ -248,8 +348,22 @@ class BattleEngine extends ChangeNotifier {
     return player.attackPhrases[phraseIndex];
   }
 
+  /// Проверяет, хватает ли энергии на размещение выбранного броска.
+  bool canPlaceDie(int hotbarIndex) {
+    if (!canAct ||
+        hotbarIndex < 0 ||
+        hotbarIndex >= hotbarSize ||
+        _hotbar[hotbarIndex] == null) {
+      return false;
+    }
+    return energy >= _energyCost(_hotbar[hotbarIndex]!);
+  }
+
+  static int _energyCost(RolledDie die) =>
+      die.dice.hasModifier(DiceModifier.light) ? 0 : 1;
+
   /// Установка сразу расходует бросок: слот хотбара остаётся пустым до
-  /// следующего раунда. Кость можно переместить или снять методом [removeDie].
+  /// следующего раунда. Легкий не расходует энергию, Стекло срабатывает сразу.
   bool placeDie(int hotbarIndex, int cell) {
     if (!canAct ||
         !_validCell(cell) ||
@@ -257,11 +371,21 @@ class BattleEngine extends ChangeNotifier {
         hotbarIndex < 0 ||
         hotbarIndex >= hotbarSize ||
         _board[cell] != null ||
-        _hotbar[hotbarIndex] == null) {
+        _hotbar[hotbarIndex] == null ||
+        !canPlaceDie(hotbarIndex)) {
       return false;
     }
-    _board[cell] = _hotbar[hotbarIndex];
+    final die = _hotbar[hotbarIndex]!;
+    energy -= _energyCost(die);
     _hotbar[hotbarIndex] = null;
+    if (die.dice.hasModifier(DiceModifier.glass)) {
+      _glassDice.add(MapEntry(cell, die));
+      final inventoryIndex = player.dice.indexOf(die.dice);
+      if (inventoryIndex >= 0) player.dice.removeAt(inventoryIndex);
+      onDiceConsumed?.call(die.dice);
+    } else {
+      _board[cell] = die;
+    }
     notifyListeners();
     return true;
   }
@@ -324,8 +448,17 @@ class BattleEngine extends ChangeNotifier {
     if (cell == null) return false;
     for (var source = 0; source < 9; source++) {
       final die = _board[source];
+      if (_cancelledCells.contains(source)) continue;
       if (die?.dice.ability == DiceAbility.upgrade &&
           upgradeTargets(source, die!.dice.level).contains(cell)) {
+        return true;
+      }
+    }
+    for (final entry in _glassDice) {
+      if (_cancelledCells.contains(entry.key)) continue;
+      final die = entry.value;
+      if (die.dice.ability == DiceAbility.upgrade &&
+          upgradeTargets(entry.key, die.dice.level).contains(cell)) {
         return true;
       }
     }
@@ -338,7 +471,9 @@ class BattleEngine extends ChangeNotifier {
         !_validCell(to) ||
         isCellRooted(to) ||
         from == to ||
-        _board[from] == null) {
+        _board[from] == null ||
+        _isLocked(_board[from]!) ||
+        (_board[to] != null && _isLocked(_board[to]!))) {
       return false;
     }
     final other = _board[to];
@@ -352,7 +487,12 @@ class BattleEngine extends ChangeNotifier {
   /// хотбара. Значение не перебрасывается: игрок может спокойно переставить
   /// кость, не теряя удачный результат.
   bool removeDie(int cell) {
-    if (!canAct || !_validCell(cell) || _board[cell] == null) return false;
+    if (!canAct ||
+        !_validCell(cell) ||
+        _board[cell] == null ||
+        _isLocked(_board[cell]!)) {
+      return false;
+    }
     final freeSlot = _hotbar.indexWhere((die) => die == null);
     if (freeSlot < 0) return false;
     _hotbar[freeSlot] = _board[cell];
@@ -365,19 +505,29 @@ class BattleEngine extends ChangeNotifier {
   bool rerollDie(int hotbarIndex) {
     if (!canAct ||
         rerollsRemaining == 0 ||
-        player.dice.isEmpty ||
+        _availableDice.isEmpty ||
         hotbarIndex < 0 ||
         hotbarIndex >= hotbarSize ||
         _hotbar[hotbarIndex] == null) {
       return false;
     }
-    _hotbar[hotbarIndex] = _drawDie();
+    final replacement = _drawDie(
+      excluded: [
+        for (var index = 0; index < _hotbar.length; index++)
+          if (index != hotbarIndex) _hotbar[index],
+      ],
+    );
+    if (replacement == null) return false;
+    _hotbar[hotbarIndex] = replacement;
     rerollsRemaining--;
     notifyListeners();
     return true;
   }
 
   static bool _validCell(int cell) => cell >= 0 && cell < 9;
+
+  static bool _isLocked(RolledDie die) =>
+      die.dice.hasModifier(DiceModifier.heavy);
 
   /// Фиксированный приоритет клеток: сначала соседи, затем дальние клетки.
   /// Пустые позиции не заменяются другими целями. Число целей по уровням:
@@ -402,6 +552,25 @@ class BattleEngine extends ChangeNotifier {
         .toList();
   }
 
+  Set<int> get upgradeTargetCells {
+    final targets = <int>{};
+    for (var source = 0; source < _board.length; source++) {
+      final die = _board[source];
+      if (_cancelledCells.contains(source)) continue;
+      if (die?.dice.ability == DiceAbility.upgrade) {
+        targets.addAll(upgradeTargets(source, die!.dice.level));
+      }
+    }
+    for (final entry in _glassDice) {
+      if (_cancelledCells.contains(entry.key)) continue;
+      final die = entry.value;
+      if (die.dice.ability == DiceAbility.upgrade) {
+        targets.addAll(upgradeTargets(entry.key, die.dice.level));
+      }
+    }
+    return Set.unmodifiable(targets);
+  }
+
   /// Усиление только на этот раунд. Каждая кость улучшения добавляет к целевой
   /// кости своё текущее выпавшее значение; верхнего ограничения в 6 нет.
   /// Поэтому несколько улучшателей на одной ячейке складываются: 6 + 2 = 8,
@@ -409,12 +578,28 @@ class BattleEngine extends ChangeNotifier {
   int effectiveValueAt(int cell) {
     if (!_validCell(cell) || _board[cell] == null) return 0;
     final target = _board[cell]!;
+    return _effectiveValueFor(cell, target);
+  }
+
+  int _effectiveValueFor(int cell, RolledDie target) {
     if (target.dice.ability == DiceAbility.upgrade) return target.value;
     var value = target.value;
     for (var source = 0; source < 9; source++) {
       final die = _board[source];
-      if (die == null || die.dice.ability != DiceAbility.upgrade) continue;
+      if (_cancelledCells.contains(source) ||
+          die == null ||
+          die.dice.ability != DiceAbility.upgrade) {
+        continue;
+      }
       if (upgradeTargets(source, die.dice.level).contains(cell)) {
+        value += die.value;
+      }
+    }
+    for (final entry in _glassDice) {
+      final die = entry.value;
+      if (_cancelledCells.contains(entry.key)) continue;
+      if (die.dice.ability == DiceAbility.upgrade &&
+          upgradeTargets(entry.key, die.dice.level).contains(cell)) {
         value += die.value;
       }
     }
@@ -444,10 +629,10 @@ class BattleEngine extends ChangeNotifier {
     var shield = 2 * (artifacts[Artifact.ironThread] ?? 0);
     var heal = 2 * (artifacts[Artifact.fieldKit] ?? 0);
     var burn = 0;
-    for (var cell = 0; cell < 9; cell++) {
-      final die = _board[cell];
-      if (die == null) continue;
-      final value = effectiveValueAt(cell);
+    void applyDie(int cell, RolledDie die) {
+      final value = _board[cell] == die
+          ? effectiveValueAt(cell)
+          : _effectiveValueFor(cell, die);
       switch (die.dice.ability) {
         case DiceAbility.none:
         case DiceAbility.warrior:
@@ -462,6 +647,17 @@ class BattleEngine extends ChangeNotifier {
           burn += value + (artifacts[Artifact.emberHeart] ?? 0);
         case DiceAbility.upgrade:
           break;
+      }
+    }
+    for (var cell = 0; cell < 9; cell++) {
+      final die = _board[cell];
+      if (die != null && !_cancelledCells.contains(cell)) {
+        applyDie(cell, die);
+      }
+    }
+    for (final entry in _glassDice) {
+      if (!_cancelledCells.contains(entry.key)) {
+        applyDie(entry.key, entry.value);
       }
     }
     return TurnEffects(attack: attack, shield: shield, heal: heal, burn: burn);
@@ -485,7 +681,7 @@ class BattleEngine extends ChangeNotifier {
     final truce =
         round == 1 &&
         (artifacts[Artifact.truceSeal] ?? 0) > 0 &&
-        intent.attack <= enemyIntent.shield &&
+        intent.attack <= enemy.shield + enemyIntent.shield &&
         enemy.burn == 0;
     final p = _ResolvedFighter(
       player,
@@ -500,7 +696,7 @@ class BattleEngine extends ChangeNotifier {
       BattleSide source,
       BattleSide target,
       int amount,
-    ) {
+      {int hits = 1}) {
       if (events == null || amount <= 0) return;
       events.add(
         BattleEvent(
@@ -509,6 +705,7 @@ class BattleEngine extends ChangeNotifier {
           source: source,
           target: target,
           amount: amount,
+          hits: hits,
         ),
       );
     }
@@ -555,8 +752,37 @@ class BattleEngine extends ChangeNotifier {
     return _Resolution(p, e);
   }
 
+  void _advanceBoard() {
+    for (var cell = 0; cell < _board.length; cell++) {
+      final die = _board[cell];
+      if (die == null) continue;
+      if (!_isLocked(die)) {
+        _board[cell] = null;
+        continue;
+      }
+      final nextLevel = die.dice.level - 1;
+      if (nextLevel <= 0) {
+        _board[cell] = null;
+        final inventoryIndex = player.dice.indexOf(die.dice);
+        if (inventoryIndex >= 0) player.dice.removeAt(inventoryIndex);
+        onDiceChanged?.call(die.dice, null);
+        continue;
+      }
+      final updated = die.dice.copyWith(level: nextLevel);
+      _board[cell] = RolledDie(
+        dice: updated,
+        value: die.value.clamp(nextLevel, 6).toInt(),
+      );
+      final inventoryIndex = player.dice.indexOf(die.dice);
+      if (inventoryIndex >= 0) player.dice[inventoryIndex] = updated;
+      onDiceChanged?.call(die.dice, updated);
+    }
+    _glassDice.clear();
+  }
+
   bool endTurn() {
     if (!canAct) return _over;
+    prepareEndTurn();
     final events = <BattleEvent>[];
     final result = _resolveWithEvents(events);
     lastEvents = List.unmodifiable(events);
@@ -565,13 +791,19 @@ class BattleEngine extends ChangeNotifier {
     if (lastPlayerDamage > 0) playerHitVersion++;
     if (lastEnemyDamage > 0) enemyHitVersion++;
     player.hp = result.player.hp;
+    player.shield = result.player.shield;
     player.burn = result.player.burn;
     enemy.hp = result.enemy.hp;
+    enemy.shield = result.enemy.shield;
     enemy.burn = result.enemy.burn;
     _over = player.isDead || enemy.isDead;
-    _board.fillRange(0, 9, null);
+    _advanceBoard();
+    _rootResolutionPrepared = false;
+    _cancelledCells.clear();
+    _rootedCells.clear();
     if (_over) {
-      _rootedCells.clear();
+      _board.fillRange(0, 9, null);
+      _glassDice.clear();
     } else {
       round++;
       _prepareRound();
@@ -595,17 +827,23 @@ class _ResolvedFighter {
     this.immune = false,
   }) : hp = fighter.hp,
        maxHp = fighter.maxHp,
-       shield = intent.shield;
+       shieldAtStart = fighter.shield + intent.shield,
+       shield = fighter.shield + intent.shield;
 
   final TurnEffects intent;
   final BattleSide side;
   final bool immune;
   final int maxHp;
+  final int shieldAtStart;
   int hp;
   int shield;
   int burn = 0;
   int outgoing = 0;
+  int outgoingDamagePerHit = 0;
+  int outgoingHits = 0;
   int incoming = 0;
+  int incomingDamagePerHit = 0;
+  int incomingHits = 0;
   int blocked = 0;
   int healing = 0;
   int burnApplied = 0;
@@ -620,21 +858,43 @@ class _ResolvedFighter {
 
   void attack(
     _ResolvedFighter target,
-    void Function(BattleEventType, BattleSide, BattleSide, int) record,
+    void Function(
+      BattleEventType,
+      BattleSide,
+      BattleSide,
+      int, {
+      int hits,
+    }) record,
   ) {
     if (hp <= 0 || target.hp <= 0) return;
-    outgoing = intent.attack;
-    record(BattleEventType.attack, side, target.side, intent.attack);
+    outgoing = intent.attack * intent.attackHits;
+    outgoingDamagePerHit = intent.attack;
+    outgoingHits = intent.attackHits;
+    record(
+      BattleEventType.attack,
+      side,
+      target.side,
+      intent.attack,
+      hits: intent.attackHits,
+    );
     if (target.immune) return;
-    final absorbed = min(target.shield, intent.attack);
-    target.blocked += absorbed;
-    target.shield -= absorbed;
-    final damage = intent.attack - absorbed;
-    record(BattleEventType.blocked, side, target.side, absorbed);
-    final appliedDamage = min(target.hp, damage);
-    target.incoming += appliedDamage;
-    target.hp = max(0, target.hp - damage);
-    record(BattleEventType.damage, side, target.side, appliedDamage);
+    final appliedPerHit = <int>[];
+    for (var hit = 0; hit < intent.attackHits && target.hp > 0; hit++) {
+      final absorbed = min(target.shield, intent.attack);
+      target.blocked += absorbed;
+      target.shield -= absorbed;
+      final damage = intent.attack - absorbed;
+      record(BattleEventType.blocked, side, target.side, absorbed);
+      final appliedDamage = min(target.hp, damage);
+      appliedPerHit.add(appliedDamage);
+      target.incoming += appliedDamage;
+      target.hp = max(0, target.hp - damage);
+      record(BattleEventType.damage, side, target.side, appliedDamage);
+    }
+    if (appliedPerHit.isNotEmpty && appliedPerHit.toSet().length == 1) {
+      target.incomingDamagePerHit = appliedPerHit.single;
+      target.incomingHits = appliedPerHit.length;
+    }
     if (target.hp > 0) {
       target.burn += intent.burn;
       burnApplied = intent.burn;
@@ -643,7 +903,13 @@ class _ResolvedFighter {
   }
 
   void heal(
-    void Function(BattleEventType, BattleSide, BattleSide, int) record,
+    void Function(
+      BattleEventType,
+      BattleSide,
+      BattleSide,
+      int, {
+      int hits,
+    }) record,
   ) {
     if (hp <= 0) return;
     healing = min(maxHp - hp, intent.heal);
@@ -653,8 +919,13 @@ class _ResolvedFighter {
 
   BattlePreview get preview => BattlePreview(
     outgoingDamage: outgoing,
+    outgoingDamagePerHit: outgoingDamagePerHit,
+    outgoingHits: outgoingHits,
     incomingDamage: incoming,
+    incomingDamagePerHit: incomingDamagePerHit,
+    incomingHits: incomingHits,
     shield: intent.shield,
+    availableShield: shieldAtStart,
     blockedDamage: blocked,
     healing: healing,
     burnApplied: burnApplied,

@@ -14,6 +14,7 @@ enum MapEntityKind {
   gopnik,
   shaurmek,
   viktorKorneplod,
+  sofia,
 }
 
 /// Базовая сущность на карте: маленький программный пиксель-спрайт с меткой.
@@ -111,6 +112,9 @@ abstract class MapEntity extends PositionComponent {
       case MapEntityKind.viktorKorneplod:
         canvas.translate(0, -12);
         _renderViktor(canvas, pixelPaint);
+      case MapEntityKind.sofia:
+        canvas.translate(0, -12);
+        _renderSofia(canvas, pixelPaint);
       case MapEntityKind.npc:
         canvas.translate(0, -12);
         _renderNpc(canvas, pixelPaint);

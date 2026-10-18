@@ -174,7 +174,15 @@ class GameContent {
     visualKey: 'upgrade',
   );
 
-  /// Архетипы, которые могут выпасть из кейса костей.
+  /// Кости, с которыми начинается новая игра. Каждый источник представлен
+  /// ровно один раз: атака, доктор и улучшение.
+  static const List<Dice> starterInventory = [
+    starterDice,
+    doctorDice,
+    upgradeDice,
+  ];
+
+  /// Архетипы, которые могут выпасть из ящика костей.
   static const List<Dice> diceCatalog = [
     starterDice,
     doctorDice,
@@ -301,9 +309,14 @@ class GameContent {
     appliesBurn: true,
     burnDamage: 3,
     coinStealChance: 1 / 3,
+    healingAmount: 5,
+    healingChance: 1 / 3,
     attackPhrases: [
       'Вай вай вай, дорогой, шаурма будишь?',
       'Паследни деньга гони',
+      'Радной, я дабавлю твоя фирменного соуса!',
+      'Студент?',
+      'С сабой или на места?',
     ],
     equipment: [
       EquipmentSlot(
@@ -330,7 +343,7 @@ class GameContent {
     coins: 30,
     xp: 26,
     startingShield: 3,
-    rootCells: 5,
+    rootCells: 4,
     attackPhrases: [
       'Я Виктор Корнеплод, меня так просто не выкопать!',
       'Корни крепкие, а удар будет ещё крепче!',
@@ -351,12 +364,38 @@ class GameContent {
     ],
   );
 
+  static const EnemyArchetype sofia = EnemyArchetype(
+    id: 'sofia',
+    name: 'София',
+    maxHp: 34,
+    diceFaces: [1, 2, 2, 3, 5, 6],
+    coins: 28,
+    xp: 24,
+    healingAmount: 5,
+    healingChance: .40,
+    hideStats: true,
+    attackPhrases: [
+      'витя умнее меня во многих сферах',
+      'я вас ненавижу и не скрываю этого',
+      'вы все пешки моего фанфика',
+    ],
+    equipment: [
+      EquipmentSlot(
+        id: 'sofia_fiction',
+        name: 'Фанфик',
+        effect: SlotEffect.damage,
+        rule: SlotRule.any,
+      ),
+    ],
+  );
+
   static const List<EnemyArchetype> enemies = [
     slime,
     goblin,
     gopnik,
     shaurmek,
     viktorKorneplod,
+    sofia,
   ];
 
   static const DialogueTree arianaDialogue = DialogueTree(

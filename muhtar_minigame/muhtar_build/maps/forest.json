@@ -263,16 +263,14 @@
       "enemyId": "gopnik",
       "col": 16,
       "row": 6
-    }
-  ],
-  "npcs": [
+    },
     {
-      "id": "sofia",
-      "name": "София",
-      "col": 20,
-      "row": 1
+      "enemyId": "sofia",
+      "col": 7,
+      "row": 2
     }
   ],
+  "npcs": [],
   "additionalNpcs": [],
   "exits": [
     {

@@ -30,10 +30,24 @@ void main() {
       final state = GameState();
       expect(state.coins, 50);
       expect(state.level, 1);
-      expect(state.dice.length, 1);
-      expect(state.dice.first.id, 'd6');
+      expect(state.dice, GameContent.starterInventory);
+      expect(
+        state.dice.map((dice) => dice.ability),
+        [DiceAbility.warrior, DiceAbility.doctor, DiceAbility.upgrade],
+      );
+      expect(state.dice.every((dice) => dice.level == 1), isTrue);
       expect(state.playerHp, 30);
       expect(state.playerMaxHp, 30);
+    });
+
+    test('reset возвращает точный стартовый набор костей', () {
+      final state = GameState()..addDiceType('ember');
+
+      state.reset();
+
+      expect(state.dice, GameContent.starterInventory);
+      expect(state.dice.length, 3);
+      expect(state.dice.every((dice) => dice.level == 1), isTrue);
     });
 
     test('addCoins/spendCoins', () {
@@ -56,6 +70,29 @@ void main() {
       state.addXp(250);
       expect(state.level, 3);
       expect(state.xp, 50);
+    });
+
+    test('каждый новый уровень добавляет 3 к максимальному HP', () {
+      final state = GameState();
+
+      state.addXp(100);
+
+      expect(state.level, 2);
+      expect(state.playerMaxHp, 33);
+    });
+
+    test('шприц с моста можно оставить или использовать один раз', () {
+      final state = GameState(random: const _FixedRandom(0));
+
+      for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
+        state.searchProp('bridge_insulin_bush');
+      }
+
+      expect(state.itemCount(GameState.insulinSyringeItemId), 1);
+      expect(state.useInsulin(), isTrue);
+      expect(state.itemCount(GameState.insulinSyringeItemId), 0);
+      expect(state.tripActive, isTrue);
+      expect(state.useInsulin(), isFalse);
     });
 
     test('upgradeDice тратит монеты и повышает уровень', () {
@@ -85,23 +122,21 @@ void main() {
 
     test('боевой набор увеличивается до шести кубиков разных типов', () {
       final state = GameState()..addCoins(10000);
-      expect(state.addDiceType('doctor'), isTrue);
       expect(state.dice.last.ability, DiceAbility.doctor);
       expect(state.addDiceType('ember'), isTrue);
       expect(state.addDiceType('guardian'), isTrue);
-      expect(state.addDiceType('doctor'), isTrue);
       expect(state.addDiceType('d6'), isTrue);
       expect(state.diceCount, 6);
-      expect(state.addDiceType('d6'), isFalse);
+      expect(state.addDiceType('doctor'), isFalse);
 
       final loaded = GameState()..fromJson(state.toJson());
       expect(loaded.diceCount, 6);
-      expect(loaded.diceTypeCount('doctor'), 2);
+      expect(loaded.diceTypeCount('doctor'), 1);
       expect(loaded.dice[1].ability, DiceAbility.doctor);
     });
 
     test(
-      'кейс добавляет случайный кубик в инвентарь, а дубликаты объединяются',
+      'ящик добавляет случайный кубик в инвентарь, а дубликаты объединяются',
       () {
         final state = GameState()..addCoins(1000);
         final before = state.inventoryCount;
@@ -139,6 +174,78 @@ void main() {
         );
       },
     );
+
+    test('ящик костей выдаёт любой тип, но только уровни 1–3', () {
+      for (final sample in [
+        (random: 0, level: 1),
+        (random: 70, level: 2),
+        (random: 99, level: 3),
+      ]) {
+        final state = GameState(random: _FixedRandom(sample.random));
+        state.addCoins(100);
+        expect(state.buyDiceBox(), isTrue);
+        final result = state.openDiceBox();
+        expect(result, isNotNull);
+        final dice = result!;
+        expect(dice.level, sample.level);
+        expect(dice.level, lessThanOrEqualTo(GameState.maxDiceBoxLevel));
+      }
+    });
+
+    test('награда ящика попадает в инвентарь только после завершения прокрутки', () {
+      final state = GameState(random: const _FixedRandom(0))..addCoins(100);
+      expect(state.buyDiceBox(), isTrue);
+      final before = state.inventoryCount;
+      final reward = state.beginDiceBoxOpening();
+
+      expect(reward, isNotNull);
+      expect(state.inventoryCount, before);
+      expect(state.pendingDiceReward, reward);
+
+      final loaded = GameState()..fromJson(state.toJson());
+      expect(loaded.inventoryCount, before);
+      expect(loaded.pendingDiceReward, reward);
+      expect(loaded.claimPendingDiceReward(), isTrue);
+      expect(loaded.inventoryCount, before + 1);
+      expect(loaded.pendingDiceReward, isNull);
+    });
+
+    test('ящик артефактов показывает модификатор первым и не стакует уникальные', () {
+      final state = GameState(random: const _FixedRandom(0));
+      state.addArtifactBoxes(1);
+      final choices = state.openArtifactBox();
+
+      expect(state.hasPendingModifierChoice, isTrue);
+      expect(choices, hasLength(3));
+      expect(choices.toSet(), hasLength(3));
+      expect(state.chooseArtifact(choices.first), isTrue);
+      expect(state.artifacts[choices.first], 1);
+      expect(state.hasPendingModifierChoice, isFalse);
+
+      state.addArtifactBoxes(1);
+      state.openArtifactBox();
+      final modifier = state.rollModifier();
+      expect(modifier, isNot(DiceModifier.none));
+      final pending = GameState()..fromJson(state.toJson());
+      expect(pending.pendingModifier, modifier);
+      expect(state.applyPendingModifier(0), isTrue);
+      expect(state.dice.first.modifier, modifier);
+    });
+
+    test('редкость и нестакуемость артефактов мигрируют из старого сейва', () {
+      final state = GameState()
+        ..fromJson({
+          'cases': {'artifact': 2},
+          'artifacts': {'truceSeal': 3, 'ironThread': 3},
+        });
+
+      expect(state.boxCount(CaseType.artifact), 2);
+      expect(state.artifacts[Artifact.truceSeal], 1);
+      expect(state.artifacts[Artifact.ironThread], 1);
+      expect(Artifact.truceSeal.stackable, isFalse);
+      expect(Artifact.ironThread.rarity, ArtifactRarity.rare);
+      expect(Artifact.fieldKit.rarity, ArtifactRarity.veryRare);
+    });
 
     test(
       'два одинаковых экземпляра одного типа можно объединить по индексам',
@@ -468,7 +575,11 @@ void main() {
       for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
         hpState.searchProp(emptyProp.id);
       }
-      expect(hpState.searchResult(emptyProp.id)!.amount, 1);
+      expect(
+        hpState.searchResult(emptyProp.id)!.amount,
+        inInclusiveRange(1, GameState.maxBushHpReward),
+      );
+      expect(hpState.searchResult(emptyProp.id)!.amount, 2);
       expect(hpState.playerHp, 30);
 
       final coinState = GameState(random: const _FixedRandom(2));
@@ -504,7 +615,7 @@ void main() {
       },
     );
 
-    test('песня открывает наградный скин без кейса', () {
+    test('песня открывает наградный скин без ящика', () {
       final state = GameState();
       expect(state.activateQuest('q_song', npcId: 'ribka'), isTrue);
       expect(state.completeSongQuest(), isTrue);

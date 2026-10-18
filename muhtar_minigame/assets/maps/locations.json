@@ -613,16 +613,14 @@
           "enemyId": "gopnik",
           "col": 16,
           "row": 6
-        }
-      ],
-      "npcs": [
+        },
         {
-          "id": "sofia",
-          "name": "София",
-          "col": 20,
-          "row": 1
+          "enemyId": "sofia",
+          "col": 7,
+          "row": 2
         }
       ],
+      "npcs": [],
       "additionalNpcs": [],
       "exits": [
         {
@@ -1195,20 +1193,9 @@
           "searchable": false
         },
         {
-          "id": "ruins_tree_7_6",
-          "kind": "tree",
-          "col": 7,
-          "row": 6,
-          "width": 1,
-          "height": 1,
-          "blocksMovement": true,
-          "variant": 1,
-          "searchable": false
-        },
-        {
-          "id": "ruins_bush_5_2",
-          "kind": "bush",
-          "col": 5,
+          "id": "bridge_crate_13_2",
+          "kind": "crate",
+          "col": 13,
           "row": 2,
           "width": 1,
           "height": 1,
@@ -1217,10 +1204,55 @@
           "searchable": false
         },
         {
-          "id": "ruins_bush_10_5",
-          "kind": "bush",
-          "col": 10,
+          "id": "bridge_lamp_24_1",
+          "kind": "lamp",
+          "col": 24,
+          "row": 1,
+          "width": 1,
+          "height": 1,
+          "blocksMovement": false,
+          "variant": 0,
+          "searchable": false
+        },
+        {
+          "id": "bridge_flower_bed_25_5",
+          "kind": "flowerBed",
+          "col": 25,
           "row": 5,
+          "width": 1,
+          "height": 1,
+          "blocksMovement": true,
+          "variant": 1,
+          "searchable": false
+        },
+        {
+          "id": "bridge_insulin_bush",
+          "kind": "bush",
+          "col": 9,
+          "row": 1,
+          "width": 1,
+          "height": 1,
+          "blocksMovement": false,
+          "variant": 0,
+          "searchable": true,
+          "specialItemId": "insulin_syringe"
+        },
+        {
+          "id": "ruins_bush_3_6",
+          "kind": "bush",
+          "col": 3,
+          "row": 6,
+          "width": 1,
+          "height": 1,
+          "blocksMovement": true,
+          "variant": 1,
+          "searchable": false
+        },
+        {
+          "id": "ruins_tree_9_6",
+          "kind": "tree",
+          "col": 9,
+          "row": 6,
           "width": 1,
           "height": 1,
           "blocksMovement": true,
@@ -1504,30 +1536,30 @@
         ],
         [
           1,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
+          15,
+          15,
+          16,
+          16,
+          15,
+          15,
+          16,
+          16,
+          15,
+          15,
           1
         ],
         [
           1,
-          0,
-          0,
+          16,
+          17,
           1,
           1,
-          0,
-          0,
-          0,
-          0,
+          15,
+          15,
+          16,
+          17,
           1,
-          0,
+          15,
           1
         ],
         [
@@ -1560,30 +1592,30 @@
         ],
         [
           1,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
+          15,
+          16,
+          15,
+          16,
+          15,
+          16,
+          15,
+          16,
+          15,
+          16,
           1
         ],
         [
           1,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
+          16,
+          15,
+          16,
+          15,
+          16,
+          15,
+          16,
+          15,
+          16,
+          15,
           1
         ],
         [
@@ -1616,8 +1648,8 @@
         {
           "id": "shaurmek",
           "name": "Шаурмек 2",
-          "col": 6,
-          "row": 3
+          "col": 8,
+          "row": 2
         }
       ],
       "additionalNpcs": [],

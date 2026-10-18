@@ -47,6 +47,10 @@ void main() {
     expect(GameContent.enemyById('gopnik')?.name, 'Гопник');
     expect(GameContent.enemyById('shaurmek')?.name, 'Шаурмек');
     expect(GameContent.enemyById('viktor_korneplod')?.name, 'Виктор Корнеплод');
+    final sofia = GameContent.enemyById('sofia');
+    expect(sofia?.hideStats, isTrue);
+    expect(sofia?.healingAmount, 5);
+    expect(sofia?.healingChance, .40);
     expect(
       Locations.meadow.enemies.map((spawn) => spawn.enemyId),
       contains('viktor_korneplod'),
@@ -58,6 +62,10 @@ void main() {
     expect(
       Locations.doner.enemies.map((spawn) => spawn.enemyId),
       contains('shaurmek'),
+    );
+    expect(
+      Locations.forest.enemies.map((spawn) => spawn.enemyId),
+      contains('sofia'),
     );
   });
 
@@ -113,7 +121,20 @@ void main() {
     );
     expect(Locations.kopeechka.additionalNpcs.single.id, 'malek');
     expect(Locations.ruins.npcs.single.id, 'ribka');
-    expect(Locations.forest.npcs.single.id, 'sofia');
+    expect(Locations.forest.npcs.where((npc) => npc.id == 'sofia'), isEmpty);
+    expect(
+      Locations.ruins.props.map((prop) => prop.kind),
+      containsAll(<LocationPropKind>[
+        LocationPropKind.crate,
+        LocationPropKind.lamp,
+        LocationPropKind.flowerBed,
+      ]),
+    );
+    final insulinBush = Locations.ruins.props.singleWhere(
+      (prop) => prop.specialItemId == 'insulin_syringe',
+    );
+    expect(insulinBush.searchable, isTrue);
+    expect(insulinBush.blocksMovement, isFalse);
     expect(
       Locations.forest.props.any(
         (prop) => prop.specialItemId == 'sync_async' && prop.searchable,
@@ -139,14 +160,11 @@ void main() {
     );
     expect(Locations.doner.npcs.single.id, 'shaurmek');
     expect(Locations.doner.npcs.single.name, 'Шаурмек 2');
-    expect(
-      Locations.doner.npcs.single.col - Locations.doner.enemies.single.col,
-      0,
-    );
-    expect(
-      Locations.doner.npcs.single.row - Locations.doner.enemies.single.row,
-      -1,
-    );
+    expect(Locations.doner.npcs.single.col, 8);
+    expect(Locations.doner.npcs.single.row, 2);
+    expect(Locations.doner.tileAt(1, 1), 15);
+    expect(Locations.doner.tileAt(3, 1), 16);
+    expect(Locations.doner.tileAt(2, 2), 17);
     expect(
       Locations.doner.props.map((prop) => prop.id),
       containsAll(<String>['doner_counter', 'doner_grill', 'doner_table']),

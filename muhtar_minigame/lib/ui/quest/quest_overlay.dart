@@ -161,7 +161,7 @@ class _QuestCard extends StatelessWidget {
                   final rewards = [
                     '${quest.coinReward} монет',
                     '${quest.xpReward} опыта',
-                    '${quest.artifactCaseReward} кейс артефактов',
+                     '${quest.artifactCaseReward} ящик артефактов',
                   ];
                   final skinRewardId = _skinRewardId(quest);
                   if (skinRewardId != null && skinRewardId.isNotEmpty) {
