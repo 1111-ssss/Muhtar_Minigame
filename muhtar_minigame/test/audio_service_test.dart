@@ -24,4 +24,28 @@ void main() {
     expect(MusicTrack.menu.fileName, 'menu_bg_music_1.wav');
     expect(musicTrackForLocation('meadow'), MusicTrack.station);
   });
+
+  test('volume channels are independent and clamped', () {
+    final audio = AudioService();
+    addTearDown(audio.dispose);
+
+    expect(audio.masterVolume, 1);
+    expect(audio.musicVolume, 1);
+    expect(audio.effectsVolume, 1);
+
+    audio.setMasterVolume(.35);
+    audio.setMusicVolume(-1);
+    audio.setEffectsVolume(2);
+
+    expect(audio.masterVolume, .35);
+    expect(audio.musicVolume, 0);
+    expect(audio.effectsVolume, 1);
+
+    audio.setMusicVolume(.6);
+    audio.setEffectsVolume(.2);
+
+    expect(audio.masterVolume, .35);
+    expect(audio.musicVolume, .6);
+    expect(audio.effectsVolume, .2);
+  });
 }

@@ -90,7 +90,11 @@ class AudioService extends ChangeNotifier {
   static const _assetRoot = 'audio/kenney/';
   static const _musicAssetRoot = 'audio/music/';
 
-  bool _enabled = true;
+  static const _baseMusicVolume = .24;
+
+  double _masterVolume = 1;
+  double _musicVolume = 1;
+  double _effectsVolume = 1;
   final List<AudioPlayer> _players = [];
   int _nextPlayer = 0;
   AudioPlayer? _musicPlayer;
@@ -98,20 +102,67 @@ class AudioService extends ChangeNotifier {
   bool _musicPlaying = false;
   bool _disposed = false;
 
-  bool get enabled => _enabled;
+  double get masterVolume => _masterVolume;
 
+  double get musicVolume => _musicVolume;
+
+  double get effectsVolume => _effectsVolume;
+
+  /// Совместимость со старым API: нулевая общая громкость означает mute.
+  @Deprecated('Use masterVolume and setMasterVolume instead.')
+  bool get enabled => _masterVolume > 0;
+
+  /// Совместимость со старым API настроек.
+  @Deprecated('Use masterVolume and setMasterVolume instead.')
   void setEnabled(bool value) {
-    if (_enabled == value) return;
-    _enabled = value;
-    if (!_enabled) {
+    if (value == enabled) return;
+    if (!value) {
+      setMasterVolume(0);
       _musicPlaying = false;
       final player = _musicPlayer;
       if (player != null) unawaited(player.pause());
-    } else {
-      final track = _currentMusic;
-      if (track != null) unawaited(playMusic(track));
+      return;
     }
+
+    setMasterVolume(1);
+    final track = _currentMusic;
+    if (track != null) unawaited(playMusic(track));
+  }
+
+  void setMasterVolume(double value) {
+    final next = _clampVolume(value);
+    if (_masterVolume == next) return;
+    _masterVolume = next;
+    _syncMusicVolume();
     notifyListeners();
+  }
+
+  void setMusicVolume(double value) {
+    final next = _clampVolume(value);
+    if (_musicVolume == next) return;
+    _musicVolume = next;
+    _syncMusicVolume();
+    notifyListeners();
+  }
+
+  void setEffectsVolume(double value) {
+    final next = _clampVolume(value);
+    if (_effectsVolume == next) return;
+    _effectsVolume = next;
+    notifyListeners();
+  }
+
+  double _clampVolume(double value) => value.clamp(0.0, 1.0).toDouble();
+
+  double get _musicOutputVolume =>
+      _baseMusicVolume * _masterVolume * _musicVolume;
+
+  double _effectsOutputVolume(double baseVolume) =>
+      baseVolume * _masterVolume * _effectsVolume;
+
+  void _syncMusicVolume() {
+    final player = _musicPlayer;
+    if (player != null) unawaited(player.setVolume(_musicOutputVolume));
   }
 
   /// Включает зацикленную фоновую композицию, не перезапуская тот же трек.
@@ -119,13 +170,12 @@ class AudioService extends ChangeNotifier {
     if (_disposed) return;
     if (_currentMusic == track && _musicPlaying) return;
     _currentMusic = track;
-    if (!_enabled) return;
     final player = _musicPlayer ??= AudioPlayer();
     try {
       await player.setReleaseMode(ReleaseMode.loop);
       await player.play(
         AssetSource('$_musicAssetRoot${track.fileName}'),
-        volume: .24,
+        volume: _musicOutputVolume,
       );
       _musicPlaying = true;
     } catch (error) {
@@ -150,11 +200,13 @@ class AudioService extends ChangeNotifier {
   }
 
   Future<void> play(GameSound sound) async {
-    if (!_enabled || _disposed) return;
+    if (_disposed) return;
     final spec = _specFor(sound);
+    final volume = _effectsOutputVolume(spec.volume);
+    if (volume <= 0) return;
     final player = _player();
     try {
-      await player.play(AssetSource(spec.asset), volume: spec.volume);
+      await player.play(AssetSource(spec.asset), volume: volume);
     } catch (error) {
       // Звук не должен ломать бой или переход между локациями, если на
       // конкретной платформе аудиоплагин недоступен.

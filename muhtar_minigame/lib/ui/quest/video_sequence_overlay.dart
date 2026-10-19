@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../../game_logic/audio_service.dart';
+
 /// Последовательный просмотр трёх роликов.
 ///
 /// Переход к следующему ролику остаётся автоматическим, но пауза и звук
@@ -13,6 +15,7 @@ class VideoSequenceOverlay extends StatefulWidget {
   const VideoSequenceOverlay({
     required this.onCompleted,
     required this.onClose,
+    required this.audio,
     super.key,
   });
 
@@ -24,6 +27,7 @@ class VideoSequenceOverlay extends StatefulWidget {
 
   final VoidCallback onCompleted;
   final VoidCallback onClose;
+  final AudioService audio;
 
   @override
   State<VideoSequenceOverlay> createState() => _VideoSequenceOverlayState();
@@ -47,14 +51,33 @@ class _VideoSequenceOverlayState extends State<VideoSequenceOverlay> {
   @override
   void initState() {
     super.initState();
+    widget.audio.addListener(_onAudioChanged);
     unawaited(_loadVideo(0));
   }
 
   @override
   void dispose() {
+    widget.audio.removeListener(_onAudioChanged);
     _loadGeneration++;
     unawaited(_disposeCurrentPlayer());
     super.dispose();
+  }
+
+  double get _videoVolumePercent =>
+      widget.audio.masterVolume * widget.audio.musicVolume * 100;
+
+  void _onAudioChanged() {
+    final player = _player;
+    if (player == null || _muted) return;
+    unawaited(_setPlayerVolume(player));
+  }
+
+  Future<void> _setPlayerVolume(Player player, {bool muted = false}) async {
+    try {
+      await player.setVolume(muted ? 0 : _videoVolumePercent);
+    } catch (_) {
+      // Громкость видео не должна ломать проигрывание ролика.
+    }
   }
 
   Future<void> _disposeCurrentPlayer() async {
@@ -124,11 +147,7 @@ class _VideoSequenceOverlayState extends State<VideoSequenceOverlay> {
         return;
       }
 
-      try {
-        await player.setVolume(_muted ? 0 : 100);
-      } catch (_) {
-        // Громкость не должна превращать успешно открытый ролик в ошибку.
-      }
+      await _setPlayerVolume(player, muted: _muted);
       final params = player.state.videoParams;
       final aspectRatio = _videoAspectRatio(params);
       setState(() {
@@ -215,7 +234,7 @@ class _VideoSequenceOverlayState extends State<VideoSequenceOverlay> {
     if (player == null || _error != null) return;
     final muted = !_muted;
     try {
-      await player.setVolume(muted ? 0 : 100);
+      await _setPlayerVolume(player, muted: muted);
       if (!mounted || !identical(_player, player)) return;
       setState(() => _muted = muted);
     } catch (_) {

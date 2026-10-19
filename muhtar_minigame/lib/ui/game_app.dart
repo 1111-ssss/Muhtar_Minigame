@@ -31,6 +31,7 @@ import 'search/potato_pickup_overlay.dart';
 import 'transition/location_transition_overlay.dart';
 import 'upgrade/upgrade_overlay.dart';
 import 'settings/settings_overlay.dart';
+import 'settings/main_menu_settings_dialog.dart';
 import 'main_menu.dart';
 
 /// Корневой виджет: связывает Flame-игру с Flutter-оверлеями.
@@ -150,6 +151,26 @@ class _GameAppState extends State<GameApp> with WidgetsBindingObserver {
     unawaited(_audio.playLocationMusic('meadow'));
   }
 
+  Future<void> _openMainMenuSettings(BuildContext menuContext) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: menuContext,
+      builder: (context) => MainMenuSettingsDialog(audio: _audio),
+    );
+  }
+
+  Future<void> _returnToMainMenu() async {
+    final game = _game;
+    if (game != null) {
+      await game.saveProgress();
+      game.overlays.remove(MuhtarGame.overlaySettings);
+    }
+    if (!mounted) return;
+    _hasSave = true;
+    unawaited(_audio.playMusic(MusicTrack.menu));
+    setState(() => _showMainMenu = true);
+  }
+
   Future<void> _precacheInitialLocations() async {
     final current =
         Locations.byId(_gameState.currentLocationId) ?? Locations.meadow;
@@ -180,7 +201,7 @@ class _GameAppState extends State<GameApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Muhtar',
+      title: 'BUBER Adventure',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(useMaterial3: false).copyWith(
         scaffoldBackgroundColor: const Color(0xFF0C1010),
@@ -224,8 +245,9 @@ class _GameAppState extends State<GameApp> with WidgetsBindingObserver {
               hasSave: _hasSave,
               onStart: _startGame,
               onNewGame: _startNewGame,
+              onSettings: _openMainMenuSettings,
             )
-          : GameView(game: _game!),
+          : GameView(game: _game!, onMainMenu: _returnToMainMenu),
     );
   }
 }
@@ -280,22 +302,12 @@ class _LoadingSplash extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   const Text(
-                    'МУХТАР',
+                    'BUBER Adventure',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 30,
+                      fontSize: 28,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'MINIGAME',
-                    style: TextStyle(
-                      color: Color(0xFF5BC0EB),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 3,
+                      letterSpacing: 1.5,
                     ),
                   ),
                   const SizedBox(height: 32),
@@ -320,10 +332,7 @@ class _LoadingSplash extends StatelessWidget {
                   const Text(
                     'Первый запуск готовит мир к плавной игре',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Color(0xFF8993A5),
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Color(0xFF8993A5), fontSize: 12),
                   ),
                 ],
               ),
@@ -338,9 +347,10 @@ class _LoadingSplash extends StatelessWidget {
 /// Material задаёт нормальный стиль текста всем оверлеям, включая HUD,
 /// уведомления и плашку перехода (без служебного двойного подчёркивания).
 class GameView extends StatelessWidget {
-  const GameView({required this.game, super.key});
+  const GameView({required this.game, required this.onMainMenu, super.key});
 
   final MuhtarGame game;
+  final Future<void> Function() onMainMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -399,6 +409,7 @@ class GameView extends StatelessWidget {
               VideoSequenceOverlay(
                 onCompleted: game.completeVideoSequence,
                 onClose: game.closeVideoSequence,
+                audio: game.audio,
               ),
           MuhtarGame.overlayShawarmaChoice: (context, MuhtarGame game) =>
               ShawarmaChoiceOverlay(onChoice: game.chooseShawarma),
@@ -415,7 +426,7 @@ class GameView extends StatelessWidget {
           MuhtarGame.overlayLocationTransition: (context, MuhtarGame game) =>
               LocationTransitionOverlay(game),
           MuhtarGame.overlaySettings: (context, MuhtarGame game) =>
-              SettingsOverlay(game),
+              SettingsOverlay(game, onMainMenu: onMainMenu),
           MuhtarGame.overlayInsulinChoice: (context, MuhtarGame game) =>
               InsulinChoiceOverlay(
                 onChoice: (inject) => game.chooseInsulin(inject: inject),
