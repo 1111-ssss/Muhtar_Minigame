@@ -91,22 +91,32 @@ class AudioService extends ChangeNotifier {
   static const _musicAssetRoot = 'audio/music/';
 
   static const _baseMusicVolume = .24;
+  // 18 × 50 ms = 900 ms плавного перехода.
+  static const _musicFadeStep = Duration(milliseconds: 50);
+  static const _musicFadeSteps = 18;
 
   double _masterVolume = 1;
   double _musicVolume = 1;
   double _effectsVolume = 1;
   final List<AudioPlayer> _players = [];
   int _nextPlayer = 0;
-  AudioPlayer? _musicPlayer;
+  final List<AudioPlayer?> _musicPlayers = [null, null];
+  final List<double> _musicLevels = [0, 0];
+  int _activeMusicSlot = 0;
   MusicTrack? _currentMusic;
   bool _musicPlaying = false;
   bool _disposed = false;
+  Future<void> _musicQueue = Future.value();
 
   double get masterVolume => _masterVolume;
 
   double get musicVolume => _musicVolume;
 
   double get effectsVolume => _effectsVolume;
+
+  MusicTrack? get currentMusic => _currentMusic;
+
+  Duration get musicFadeDuration => _musicFadeStep * _musicFadeSteps;
 
   /// Совместимость со старым API: нулевая общая громкость означает mute.
   @Deprecated('Use masterVolume and setMasterVolume instead.')
@@ -118,9 +128,10 @@ class AudioService extends ChangeNotifier {
     if (value == enabled) return;
     if (!value) {
       setMasterVolume(0);
+      // Помечаем музыку остановленной сразу, чтобы повторное включение могло
+      // поставить playMusic после уже запланированного fade-out.
       _musicPlaying = false;
-      final player = _musicPlayer;
-      if (player != null) unawaited(player.pause());
+      unawaited(pauseMusic());
       return;
     }
 
@@ -161,27 +172,83 @@ class AudioService extends ChangeNotifier {
       baseVolume * _masterVolume * _effectsVolume;
 
   void _syncMusicVolume() {
-    final player = _musicPlayer;
-    if (player != null) unawaited(player.setVolume(_musicOutputVolume));
+    for (var slot = 0; slot < _musicPlayers.length; slot++) {
+      final player = _musicPlayers[slot];
+      if (player == null) continue;
+      unawaited(player.setVolume(_musicOutputVolume * _musicLevels[slot]));
+    }
   }
 
-  /// Включает зацикленную фоновую композицию, не перезапуская тот же трек.
-  Future<void> playMusic(MusicTrack track) async {
+  /// Включает зацикленную фоновую композицию с кроссфейдом.
+  ///
+  /// Два плеера нужны намеренно: новый трек начинает играть на нулевой
+  /// громкости, пока старый одновременно затихает. Последовательная очередь
+  /// защищает от гонки, когда игрок быстро открывает и закрывает несколько
+  /// экранов с разной музыкой.
+  Future<void> playMusic(MusicTrack track) {
+    final operation = _musicQueue.then((_) => _playMusic(track));
+    _musicQueue = operation.catchError((Object error) {
+      debugPrint('Не удалось переключить музыку на $track: $error');
+    });
+    return operation;
+  }
+
+  Future<void> _playMusic(MusicTrack track) async {
     if (_disposed) return;
     if (_currentMusic == track && _musicPlaying) return;
-    _currentMusic = track;
-    final player = _musicPlayer ??= AudioPlayer();
+
+    final oldSlot = _activeMusicSlot;
+    final oldPlayer = _musicPlaying ? _musicPlayers[oldSlot] : null;
+    final newSlot = oldPlayer == null ? oldSlot : 1 - oldSlot;
+    var player = _musicPlayers[newSlot];
+
     try {
+      if (player != null) await player.stop();
+      player ??= AudioPlayer();
+      _musicPlayers[newSlot] = player;
       await player.setReleaseMode(ReleaseMode.loop);
+      _musicLevels[newSlot] = 0;
+      await player.setVolume(0);
       await player.play(
         AssetSource('$_musicAssetRoot${track.fileName}'),
-        volume: _musicOutputVolume,
+        volume: 0,
       );
+      if (_disposed) return;
+
+      _currentMusic = track;
       _musicPlaying = true;
+      await _crossfade(oldPlayer: oldPlayer, oldSlot: oldSlot, newSlot: newSlot);
     } catch (error) {
-      _musicPlaying = false;
+      _musicLevels[newSlot] = 0;
+      final failedPlayer = player;
+      if (failedPlayer != null) unawaited(failedPlayer.stop());
+      _musicPlaying = oldPlayer != null;
       debugPrint('Не удалось воспроизвести музыку $track: $error');
     }
+  }
+
+  Future<void> _crossfade({
+    required AudioPlayer? oldPlayer,
+    required int oldSlot,
+    required int newSlot,
+  }) async {
+    for (var step = 1; step <= _musicFadeSteps; step++) {
+      await Future<void>.delayed(_musicFadeStep);
+      if (_disposed) return;
+
+      final progress = step / _musicFadeSteps;
+      _musicLevels[newSlot] = progress;
+      if (oldPlayer != null) _musicLevels[oldSlot] = 1 - progress;
+      _syncMusicVolume();
+    }
+
+    if (oldPlayer != null) {
+      _musicLevels[oldSlot] = 0;
+      await oldPlayer.stop();
+    }
+    _musicLevels[newSlot] = 1;
+    _activeMusicSlot = newSlot;
+    _syncMusicVolume();
   }
 
   Future<void> playLocationMusic(String locationId) =>
@@ -194,9 +261,27 @@ class AudioService extends ChangeNotifier {
       playMusic(boss ? MusicTrack.boss : MusicTrack.fight);
 
   Future<void> pauseMusic() async {
+    final operation = _musicQueue.then((_) => _pauseMusic());
+    _musicQueue = operation.catchError((Object error) {
+      debugPrint('Не удалось поставить музыку на паузу: $error');
+    });
+    await operation;
+  }
+
+  Future<void> _pauseMusic() async {
+    if (_disposed) return;
+    final slot = _activeMusicSlot;
+    final player = _musicPlayers[slot];
+    if (player == null) return;
+
     _musicPlaying = false;
-    final player = _musicPlayer;
-    if (player != null) await player.pause();
+    for (var step = _musicFadeSteps; step >= 0; step--) {
+      await Future<void>.delayed(_musicFadeStep);
+      if (_disposed) return;
+      _musicLevels[slot] = step / _musicFadeSteps;
+      _syncMusicVolume();
+    }
+    await player.pause();
   }
 
   Future<void> play(GameSound sound) async {
@@ -270,9 +355,10 @@ class AudioService extends ChangeNotifier {
       unawaited(player.dispose());
     }
     _players.clear();
-    final musicPlayer = _musicPlayer;
-    _musicPlayer = null;
-    if (musicPlayer != null) unawaited(musicPlayer.dispose());
+    for (final player in _musicPlayers) {
+      if (player != null) unawaited(player.dispose());
+    }
+    _musicPlayers.fillRange(0, _musicPlayers.length, null);
     super.dispose();
   }
 }

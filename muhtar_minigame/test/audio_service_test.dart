@@ -48,4 +48,12 @@ void main() {
     expect(audio.musicVolume, .6);
     expect(audio.effectsVolume, .2);
   });
+
+  test('music exposes the configured crossfade duration', () {
+    final audio = AudioService();
+    addTearDown(audio.dispose);
+
+    expect(audio.currentMusic, isNull);
+    expect(audio.musicFadeDuration, const Duration(milliseconds: 900));
+  });
 }
