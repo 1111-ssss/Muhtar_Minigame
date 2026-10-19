@@ -107,6 +107,7 @@ class AudioService extends ChangeNotifier {
   bool _musicPlaying = false;
   bool _disposed = false;
   Future<void> _musicQueue = Future.value();
+  MusicTrack? _latestRequestedMusic;
 
   double get masterVolume => _masterVolume;
 
@@ -184,9 +185,14 @@ class AudioService extends ChangeNotifier {
   /// Два плеера нужны намеренно: новый трек начинает играть на нулевой
   /// громкости, пока старый одновременно затихает. Последовательная очередь
   /// защищает от гонки, когда игрок быстро открывает и закрывает несколько
-  /// экранов с разной музыкой.
+  /// экранов с разной музыкой. Если за время fade пришло несколько запросов,
+  /// промежуточные треки пропускаются и включается только последний.
   Future<void> playMusic(MusicTrack track) {
-    final operation = _musicQueue.then((_) => _playMusic(track));
+    _latestRequestedMusic = track;
+    final operation = _musicQueue.then<void>((_) async {
+      if (_latestRequestedMusic != track) return;
+      await _playMusic(track);
+    });
     _musicQueue = operation.catchError((Object error) {
       debugPrint('Не удалось переключить музыку на $track: $error');
     });
