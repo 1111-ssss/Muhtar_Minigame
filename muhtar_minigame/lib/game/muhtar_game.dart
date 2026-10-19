@@ -88,7 +88,10 @@ class MuhtarGame extends FlameGame
 
   /// Интервал шагов при удержании клавиши. Первый шаг выполняется сразу в
   /// [_beginMovementIntent], поэтому отдельной паузы перед повтором нет.
-  static const _heldMoveRepeat = 0.13;
+  // Шаг длится примерно 0.14 секунды при текущей скорости игрока. Интервал
+  // короче этого времени успевает поставить следующий тайл в очередь до
+  // завершения текущего, поэтому удержание клавиши даёт непрерывную цепочку.
+  static const _heldMoveRepeat = 0.06;
 
   static const overlayHud = 'hud';
   static const overlayBattle = 'battle';

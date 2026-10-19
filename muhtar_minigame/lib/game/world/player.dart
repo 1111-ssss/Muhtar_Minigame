@@ -38,6 +38,11 @@ class Player extends MapEntity {
   /// прерванного перехода.
   (int, int)? get movementTargetTile => path.isEmpty ? null : path.first;
 
+  /// Последний тайл очереди движения. Нужен для удерживаемой клавиши: пока
+  /// игрок проходит текущий тайл, следующий шаг можно положить в очередь и
+  /// убрать паузу между шагами.
+  (int, int)? get movementPathTailTile => path.isEmpty ? null : path.last;
+
   /// Направление текущего перехода на сетке. Для управления используются
   /// только четыре направления: `(0, ±1)` и `(±1, 0)`.
   (int, int)? get movementDirection {
@@ -54,6 +59,17 @@ class Player extends MapEntity {
       ..clear()
       ..addAll(tiles);
     _moving = path.isNotEmpty;
+  }
+
+  /// Добавляет один проверенный тайл в конец текущего маршрута.
+  void queueMoveTo((int, int) tile) {
+    if (path.isEmpty) {
+      moveTo([tile]);
+      return;
+    }
+    if (path.last == tile) return;
+    path.add(tile);
+    _moving = true;
   }
 
   /// Останавливает движение.

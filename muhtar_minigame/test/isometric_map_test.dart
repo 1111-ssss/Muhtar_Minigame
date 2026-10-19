@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:muhtar_minigame/domain/locations.dart';
 import 'package:muhtar_minigame/game/world/isometric_map.dart';
 import 'package:muhtar_minigame/game_logic/pathfinding.dart';
+import 'package:muhtar_minigame/game_logic/location_assets.dart';
 import 'package:muhtar_minigame/domain/location.dart';
 
 void main() {
@@ -154,10 +155,30 @@ void main() {
       );
       expect(
         Locations.ruins.props
+            .where((prop) => prop.id == 'bridge_tree_right_34_1')
+            .single,
+        predicate<LocationProp>((prop) => prop.col == 30 && prop.row == 1),
+      );
+      expect(
+        Locations.ruins.props
+            .where((prop) => prop.id == 'bridge_bush_right_34_6')
+            .single,
+        predicate<LocationProp>((prop) => prop.col == 30 && prop.row == 6),
+      );
+      expect(
+        Locations.ruins.props
+            .where((prop) => prop.id == 'bridge_flower_bed_right_36_4')
+            .single,
+        predicate<LocationProp>((prop) => prop.col == 36 && prop.row == 1),
+      );
+      expect(
+        Locations.ruins.props
             .where((prop) => prop.col >= 28)
-            .every((prop) => !Locations.ruins.exits.any(
-              (exit) => exit.col == prop.col && exit.row == prop.row,
-            )),
+            .every(
+              (prop) => !Locations.ruins.exits.any(
+                (exit) => exit.col == prop.col && exit.row == prop.row,
+              ),
+            ),
         isTrue,
       );
       for (var row = 0; row < Locations.ruins.rows; row++) {
@@ -257,20 +278,25 @@ void main() {
       expect(Locations.cheburechnaya.exits.single.targetId, 'ruins');
     });
 
-    test('station keeps only rail tiles and park trees are solid', () {
-      // Поезд и его пропы удалены: у вокзала остались только тайлы рельс.
-      expect(Locations.meadow.props, everyElement(isNotNull));
+    test('station has rail tiles and a readable decorative layout', () {
+      final stationKinds = Locations.meadow.props.map((prop) => prop.kind);
+      expect(stationKinds, contains(LocationPropKind.lamp));
+      expect(stationKinds, contains(LocationPropKind.bench));
+      expect(stationKinds, contains(LocationPropKind.flowerBed));
+      expect(stationKinds, contains(LocationPropKind.crate));
       expect(
-        Locations.meadow.props.map((prop) => prop.kind).toSet(),
-        everyElement(
-          anyOf(
-            LocationPropKind.tree,
-            LocationPropKind.rock,
-            LocationPropKind.bush,
-          ),
-        ),
+        Locations.meadow.props.map((prop) => prop.id),
+        containsAll(<String>[
+          'meadow_lamp_left',
+          'meadow_lamp_right',
+          'meadow_bench_left',
+          'meadow_bench_right',
+          'meadow_flower_bed',
+          'meadow_crate',
+        ]),
       );
-      expect(Locations.meadow.isWalkable(10, 1), isTrue);
+      expect(Locations.meadow.isWalkable(8, 1), isTrue);
+      expect(Locations.meadow.isWalkable(10, 1), isFalse);
       expect(Locations.meadow.isWalkable(10, 2), isTrue);
       expect(Locations.meadow.isWalkable(8, 2), isTrue);
       expect([
@@ -281,6 +307,18 @@ void main() {
       expect(
         Locations.meadow.enemies.map((spawn) => spawn.enemyId),
         contains('viktor_korneplod'),
+      );
+      expect(Locations.forest.tileAt(8, 4), 14);
+      expect(Locations.forest.tileAt(14, 8), 13);
+      expect(
+        Locations.forest.props.map((prop) => prop.id),
+        containsAll(<String>[
+          'forest_lamp_west',
+          'forest_lamp_east',
+          'forest_flower_bed_west',
+          'forest_flower_bed_east',
+          'forest_tree_north_east',
+        ]),
       );
       expect(Locations.forest.isWalkable(3, 2), isFalse);
       expect(Locations.forest.isWalkable(9, 3), isFalse);
@@ -373,6 +411,22 @@ void main() {
 
       expect(pathfinding.findPath((0, 0), (1, 0)), [(1, 0)]);
       expect(pathfinding.findPath((0, 0), (2, 0)), isEmpty);
+    });
+
+    testWidgets('published first maps keep their tiles and decorations', (
+      tester,
+    ) async {
+      await LocationAssets.load();
+
+      final station = Locations.byId('meadow')!;
+      final park = Locations.byId('forest')!;
+
+      expect(station.tileAt(7, 3), 14);
+      expect(station.propById('meadow_lamp_left'), isNotNull);
+      expect(station.propById('meadow_bench_right'), isNotNull);
+      expect(park.tileAt(8, 4), 14);
+      expect(park.tileAt(14, 8), 13);
+      expect(park.propById('forest_flower_bed_east'), isNotNull);
     });
   });
 }

@@ -374,15 +374,25 @@ class GameWorld extends World {
 
     // Перпендикулярное направление не перенаправляет персонажа по косой
     // линии из середины тайла. Оно будет обработано следующим повтором,
-    // когда текущий короткий сегмент завершится.
-    if (player.isMoving) return false;
+    // когда текущий короткий сегмент завершится. Для того же направления
+    // заранее ставим следующий тайл в очередь: это убирает остановку между
+    // шагами при удержании WASD/стрелки.
+    final appendingToMovement = player.isMoving;
+    if (appendingToMovement) {
+      if (activeDirection == null || activeDirection != (dCol, dRow)) {
+        return false;
+      }
+      if (player.path.length >= 2) return true;
+    }
 
-    final target = (player.col + dCol, player.row + dRow);
+    final origin = player.movementPathTailTile ?? player.tile;
+    final target = (origin.$1 + dCol, origin.$2 + dRow);
     if (!location.inBounds(target.$1, target.$2)) return false;
 
     // Столкновение с врагом — бой.
     for (final enemy in enemies) {
       if (enemy.col == target.$1 && enemy.row == target.$2) {
+        if (appendingToMovement) return false;
         _pendingNpc = null;
         _pendingProp = null;
         onBattleStart(enemy);
@@ -393,6 +403,7 @@ class GameWorld extends World {
     // Столкновение с NPC — диалог.
     for (final npc in npcs) {
       if (npc.col == target.$1 && npc.row == target.$2) {
+        if (appendingToMovement) return false;
         _pendingEnemy = null;
         _pendingProp = null;
         onNpcTalk(npc);
@@ -402,6 +413,7 @@ class GameWorld extends World {
 
     final prop = _interactablePropAt(target.$1, target.$2);
     if (prop != null) {
+      if (appendingToMovement) return false;
       _approachToProp(prop);
       return true;
     }
@@ -416,7 +428,11 @@ class GameWorld extends World {
       _pendingEnemy = null;
       _pendingNpc = null;
       _pendingProp = null;
-      player.moveTo([target]);
+      if (appendingToMovement) {
+        player.queueMoveTo(target);
+      } else {
+        player.moveTo([target]);
+      }
       return true;
     }
 
@@ -425,7 +441,11 @@ class GameWorld extends World {
     _pendingProp = null;
     // Не вызываем stop(): он возвращает позицию в центр исходной клетки и
     // именно это создавало визуальный рывок/ощущение сдвинутой коллизии.
-    player.moveTo([target]);
+    if (appendingToMovement) {
+      player.queueMoveTo(target);
+    } else {
+      player.moveTo([target]);
+    }
     return true;
   }
 

@@ -35,6 +35,24 @@ void main() {
       expect(player.isMoving, isFalse);
     });
 
+    test('queues the next tile while the current tile is moving', () {
+      final player = Player(col: 5, row: 5)
+        ..position = IsometricMap.tileToWorld(5, 5);
+
+      player.moveTo([(6, 5)]);
+      player.queueMoveTo((7, 5));
+
+      expect(player.movementPathTailTile, (7, 5));
+      player.update(.2);
+
+      expect(player.tile, (6, 5));
+      expect(player.isMoving, isTrue);
+      player.update(.2);
+
+      expect(player.tile, (7, 5));
+      expect(player.isMoving, isFalse);
+    });
+
     test('stop snaps the visual foot point to the logical tile center', () {
       final player = Player(col: 3, row: 7)..position = Vector2(123, 456);
 

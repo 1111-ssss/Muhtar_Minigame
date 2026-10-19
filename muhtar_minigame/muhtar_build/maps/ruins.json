@@ -31,9 +31,9 @@
     {"id": "ruins_bush_3_6", "kind": "bush", "col": 3, "row": 6, "width": 1, "height": 1, "blocksMovement": true, "variant": 1, "searchable": false},
     {"id": "ruins_tree_9_6", "kind": "tree", "col": 9, "row": 6, "width": 1, "height": 1, "blocksMovement": true, "variant": 1, "searchable": false},
     {"id": "bridge_potato", "kind": "rock", "col": 18, "row": 3, "width": 1, "height": 1, "blocksMovement": false, "variant": 2, "searchable": true, "specialItemId": "potato"},
-    {"id": "bridge_tree_right_34_1", "kind": "tree", "col": 34, "row": 1, "width": 1, "height": 1, "blocksMovement": true, "variant": 2, "searchable": false},
-    {"id": "bridge_bush_right_34_6", "kind": "bush", "col": 34, "row": 6, "width": 1, "height": 1, "blocksMovement": true, "variant": 0, "searchable": false},
-    {"id": "bridge_flower_bed_right_36_4", "kind": "flowerBed", "col": 36, "row": 4, "width": 1, "height": 1, "blocksMovement": true, "variant": 0, "searchable": false}
+    {"id": "bridge_tree_right_34_1", "kind": "tree", "col": 30, "row": 1, "width": 1, "height": 1, "blocksMovement": true, "variant": 2, "searchable": false},
+    {"id": "bridge_bush_right_34_6", "kind": "bush", "col": 30, "row": 6, "width": 1, "height": 1, "blocksMovement": true, "variant": 0, "searchable": false},
+    {"id": "bridge_flower_bed_right_36_4", "kind": "flowerBed", "col": 36, "row": 1, "width": 1, "height": 1, "blocksMovement": true, "variant": 0, "searchable": false}
   ],
   "outsideTile": 6,
   "outsideGroundRegions": [
