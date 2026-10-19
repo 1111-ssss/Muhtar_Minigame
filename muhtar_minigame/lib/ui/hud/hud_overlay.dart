@@ -86,21 +86,6 @@ class HudOverlay extends StatelessWidget {
                 ),
               ),
             ),
-
-            // Нижняя панель оставляет только текущие цели; действия теперь
-            // доступны компактными иконками в правом верхнем углу.
-            Positioned(
-              bottom: 16,
-              left: 16,
-              right: 16,
-              child: SafeArea(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [_ActiveQuests(state: state)],
-                ),
-              ),
-            ),
           ],
         );
       },
@@ -271,40 +256,6 @@ class _XpBar extends StatelessWidget {
             child: Container(color: Colors.cyan),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ActiveQuests extends StatelessWidget {
-  const _ActiveQuests({required this.state});
-
-  final GameState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final active = state.activeQuests;
-    if (active.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final q in active.take(3))
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Text(
-                '• ${q.quest.title}: ${q.progress}/${q.quest.target}',
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-              ),
-            ),
-        ],
       ),
     );
   }
