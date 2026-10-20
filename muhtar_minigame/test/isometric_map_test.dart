@@ -151,7 +151,23 @@ void main() {
           'bridge_tree_right_34_1',
           'bridge_bush_right_34_6',
           'bridge_flower_bed_right_36_4',
+          'bridge_lamp_15_1',
+          'bridge_lamp_24_6',
+          'bridge_flower_bed_left_5_1',
         ]),
+      );
+      expect(
+        Locations.ruins.props
+            .where(
+              (prop) =>
+                  prop.id == 'bridge_lamp_15_1' ||
+                  prop.id == 'bridge_lamp_15_6' ||
+                  prop.id == 'bridge_lamp_24_6' ||
+                  prop.id == 'bridge_flower_bed_left_5_1' ||
+                  prop.id == 'bridge_flower_bed_right_35_6',
+            )
+            .every((prop) => !prop.blocksMovement),
+        isTrue,
       );
       expect(
         Locations.ruins.props
@@ -194,7 +210,7 @@ void main() {
         for (var col = 12; col <= 27; col++) {
           expect(
             Locations.ruins.tileAt(col, row),
-            row == 0 || row == 7 ? 7 : 0,
+            row == 0 || row == 7 ? 7 : 11,
           );
         }
       }
@@ -420,6 +436,7 @@ void main() {
 
       final station = Locations.byId('meadow')!;
       final park = Locations.byId('forest')!;
+      final bridge = Locations.byId('ruins')!;
 
       expect(station.tileAt(7, 3), 14);
       expect(station.propById('meadow_lamp_left'), isNotNull);
@@ -427,6 +444,12 @@ void main() {
       expect(park.tileAt(8, 4), 14);
       expect(park.tileAt(14, 8), 13);
       expect(park.propById('forest_flower_bed_east'), isNotNull);
+      for (var row = 1; row <= 6; row++) {
+        expect(bridge.tiles[row].sublist(12, 28), everyElement(11));
+      }
+      expect(bridge.propById('bridge_lamp_15_1'), isNotNull);
+      expect(bridge.propById('bridge_lamp_24_6'), isNotNull);
+      expect(bridge.propById('bridge_flower_bed_left_5_1'), isNotNull);
     });
   });
 }

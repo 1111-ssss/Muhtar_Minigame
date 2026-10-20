@@ -4,12 +4,12 @@
   "name": "Мост",
   "tiles": [
     [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
-    [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
-    [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 4],
-    [4, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
-    [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
-    [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
-    [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+    [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+    [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 4],
+    [4, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+    [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+    [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 4, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+    [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 4, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
     [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9]
   ],
   "spawn": [2, 3],
@@ -26,6 +26,9 @@
     {"id": "ruins_tree_3_1", "kind": "tree", "col": 3, "row": 1, "width": 1, "height": 1, "blocksMovement": true, "variant": 0, "searchable": false},
     {"id": "bridge_crate_13_2", "kind": "crate", "col": 14, "row": 2, "width": 1, "height": 1, "blocksMovement": true, "variant": 0, "searchable": false},
     {"id": "bridge_lamp_24_1", "kind": "lamp", "col": 24, "row": 1, "width": 1, "height": 1, "blocksMovement": false, "variant": 0, "searchable": false},
+    {"id": "bridge_lamp_15_1", "kind": "lamp", "col": 15, "row": 1, "width": 1, "height": 1, "blocksMovement": false, "variant": 1, "searchable": false},
+    {"id": "bridge_lamp_15_6", "kind": "lamp", "col": 15, "row": 6, "width": 1, "height": 1, "blocksMovement": false, "variant": 0, "searchable": false},
+    {"id": "bridge_lamp_24_6", "kind": "lamp", "col": 24, "row": 6, "width": 1, "height": 1, "blocksMovement": false, "variant": 1, "searchable": false},
     {"id": "bridge_flower_bed_25_5", "kind": "flowerBed", "col": 26, "row": 5, "width": 1, "height": 1, "blocksMovement": true, "variant": 1, "searchable": false},
     {"id": "bridge_insulin_bush", "kind": "bush", "col": 9, "row": 1, "width": 1, "height": 1, "blocksMovement": false, "variant": 0, "searchable": true, "specialItemId": "insulin_syringe"},
     {"id": "ruins_bush_3_6", "kind": "bush", "col": 3, "row": 6, "width": 1, "height": 1, "blocksMovement": true, "variant": 1, "searchable": false},
@@ -33,7 +36,9 @@
     {"id": "bridge_potato", "kind": "rock", "col": 18, "row": 3, "width": 1, "height": 1, "blocksMovement": false, "variant": 2, "searchable": true, "specialItemId": "potato"},
     {"id": "bridge_tree_right_34_1", "kind": "tree", "col": 30, "row": 1, "width": 1, "height": 1, "blocksMovement": true, "variant": 2, "searchable": false},
     {"id": "bridge_bush_right_34_6", "kind": "bush", "col": 30, "row": 6, "width": 1, "height": 1, "blocksMovement": true, "variant": 0, "searchable": false},
-    {"id": "bridge_flower_bed_right_36_4", "kind": "flowerBed", "col": 36, "row": 1, "width": 1, "height": 1, "blocksMovement": true, "variant": 0, "searchable": false}
+    {"id": "bridge_flower_bed_right_36_4", "kind": "flowerBed", "col": 36, "row": 1, "width": 1, "height": 1, "blocksMovement": true, "variant": 0, "searchable": false},
+    {"id": "bridge_flower_bed_left_5_1", "kind": "flowerBed", "col": 5, "row": 1, "width": 1, "height": 1, "blocksMovement": false, "variant": 0, "searchable": false},
+    {"id": "bridge_flower_bed_right_35_6", "kind": "flowerBed", "col": 35, "row": 6, "width": 1, "height": 1, "blocksMovement": false, "variant": 1, "searchable": false}
   ],
   "outsideTile": 6,
   "outsideGroundRegions": [

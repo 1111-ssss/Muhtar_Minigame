@@ -207,22 +207,22 @@ class Locations {
   static const _bridgeBank = <int>[9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9];
   static const _bridgeBankWithExit = <int>[9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9];
   static const _bridgeDeck = <int>[
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
   ];
   // ignore: unused_field, retained for old editor drafts.
   static const _bridgeCenterExitEdge = <int>[
@@ -376,7 +376,7 @@ class Locations {
     ..._bridgeBankWithExit,
   ];
 
-  /// Мост с травяными площадками и серым центральным пролётом.
+  /// Мост с травяными берегами, деревянным настилом и каменным краем.
   /// Внутренний id `ruins` сохранён для сейвов.
   static const LocationDef ruins = LocationDef(
     id: 'ruins',
@@ -429,6 +429,30 @@ class Locations {
         variant: 0,
       ),
       LocationProp(
+        id: 'bridge_lamp_15_1',
+        kind: LocationPropKind.lamp,
+        col: 15,
+        row: 1,
+        blocksMovement: false,
+        variant: 1,
+      ),
+      LocationProp(
+        id: 'bridge_lamp_15_6',
+        kind: LocationPropKind.lamp,
+        col: 15,
+        row: 6,
+        blocksMovement: false,
+        variant: 0,
+      ),
+      LocationProp(
+        id: 'bridge_lamp_24_6',
+        kind: LocationPropKind.lamp,
+        col: 24,
+        row: 6,
+        blocksMovement: false,
+        variant: 1,
+      ),
+      LocationProp(
         id: 'bridge_flower_bed_25_5',
         kind: LocationPropKind.flowerBed,
         col: 26,
@@ -476,6 +500,22 @@ class Locations {
         col: 36,
         row: 1,
         variant: 0,
+      ),
+      LocationProp(
+        id: 'bridge_flower_bed_left_5_1',
+        kind: LocationPropKind.flowerBed,
+        col: 5,
+        row: 1,
+        blocksMovement: false,
+        variant: 0,
+      ),
+      LocationProp(
+        id: 'bridge_flower_bed_right_35_6',
+        kind: LocationPropKind.flowerBed,
+        col: 35,
+        row: 6,
+        blocksMovement: false,
+        variant: 1,
       ),
     ],
     exits: [
