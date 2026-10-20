@@ -1,14 +1,19 @@
 import 'package:flame/game.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:muhtar_minigame/domain/location.dart';
 import 'package:muhtar_minigame/game/world/enemy_entity.dart';
 import 'package:muhtar_minigame/game/world/game_world.dart';
 import 'package:muhtar_minigame/game/world/npc_entity.dart';
 import 'package:muhtar_minigame/game_logic/game_state.dart';
 
-Future<void> _mountWorld(WidgetTester tester, GameWorld world) async {
+Future<void> _mountWorld(
+  WidgetTester tester,
+  GameWorld world, {
+  String locationId = 'meadow',
+}) async {
   await tester.runAsync(() async {
     await tester.pumpWidget(GameWidget(game: FlameGame(world: world)));
-    await world.loadLocation('meadow');
+    await world.loadLocation(locationId);
   });
   for (var i = 0; i < 3; i++) {
     await tester.pump(const Duration(milliseconds: 16));
@@ -18,10 +23,13 @@ Future<void> _mountWorld(WidgetTester tester, GameWorld world) async {
 GameWorld _world({
   void Function(EnemyEntity enemy)? onBattleStart,
   void Function(NpcEntity npc)? onNpcTalk,
+  void Function(LocationExit exit)? onLocationChange,
+  String locationId = 'meadow',
 }) {
+  final gameState = GameState()..currentLocationId = locationId;
   return GameWorld(
-    gameState: GameState(),
-    onLocationChange: (_) {},
+    gameState: gameState,
+    onLocationChange: onLocationChange ?? (_) {},
     onBattleStart: onBattleStart ?? (_) {},
     onNpcTalk: onNpcTalk ?? (_) {},
   );
@@ -61,6 +69,33 @@ void main() {
     expect(world.movePlayerBy(1, 0), isTrue);
     expect(world.movePlayerBy(1, 0), isTrue);
     expect(world.player.path, [(8, 10), (9, 10)]);
+  });
+
+  testWidgets('holding direction cannot pass through an exit tile', (
+    tester,
+  ) async {
+    LocationExit? usedExit;
+    final world = _world(
+      locationId: 'ruins',
+      onLocationChange: (exit) => usedExit = exit,
+    );
+    await _mountWorld(tester, world, locationId: 'ruins');
+
+    // На Мосту клетка (28, 5) ведёт в Копеечку, а (29, 5) уже находится за
+    // ней. Быстрое удержание вправо успевает поставить оба тайла в очередь.
+    world.player
+      ..col = 27
+      ..row = 5
+      ..syncPosition();
+    expect(world.movePlayerBy(1, 0), isTrue);
+    expect(world.movePlayerBy(1, 0), isTrue);
+    expect(world.player.path, [(28, 5), (29, 5)]);
+
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(usedExit?.targetId, 'kopeechka');
+    expect(world.player.tile, (28, 5));
+    expect(world.player.path, isEmpty);
   });
 
   testWidgets('stepping onto an enemy or NPC uses the matching callback', (

@@ -42,7 +42,11 @@ class GameWorld extends World {
   /// Игрок живёт столько же, сколько мир: единственный экземпляр, который
   /// loadLocation лишь переперемещает. Это позволяет обращаться к нему
   /// (например, из боёв и диалогов) до первой загрузки локации.
-  final Player player = Player(col: 0, row: 0);
+  late final Player player = Player(
+    col: 0,
+    row: 0,
+    onTileReached: _onPlayerTileReached,
+  );
   late IsometricMap map;
   late LocationDef location;
   final List<EnemyEntity> enemies = [];
@@ -51,6 +55,7 @@ class GameWorld extends World {
 
   Pathfinding? _pathfinding;
   bool _loadingLocation = false;
+  Future<void>? _activeLocationLoad;
   bool _exitPending = false;
 
   /// Враг/NPC, к которому игрок сейчас подходит для взаимодействия.
@@ -80,15 +85,17 @@ class GameWorld extends World {
 
     _updateRespawnTimers();
 
+    // Переход проверяем независимо от player.isMoving: при удержании клавиши
+    // следующий тайл может уже лежать в очереди, когда игрок встал на клетку
+    // телепорта. Иначе персонаж успевал пройти переход насквозь.
+    final exit = location.exitAt(player.col, player.row);
+    if (exit != null) {
+      _useExit(exit);
+      return;
+    }
+
     // Игрок дошёл до цели взаимодействия — запускаем бой/диалог.
     if (!player.isMoving) {
-      // Переход срабатывает и тогда, когда игрок пришёл на клетку телепорта
-      // обычным маршрутом, а не только при прямом тапе по самой клетке.
-      final exit = location.exitAt(player.col, player.row);
-      if (exit != null) {
-        _useExit(exit);
-        return;
-      }
       if (_pendingEnemy != null) {
         final enemy = _pendingEnemy!;
         if (_isAdjacent(player.col, player.row, enemy.col, enemy.row)) {
@@ -124,7 +131,22 @@ class GameWorld extends World {
     (int, int)? spawnOverride,
     String? fromLocationId,
   }) async {
-    if (_loadingLocation) return;
+    final activeLoad = _activeLocationLoad;
+    if (activeLoad != null) {
+      await activeLoad;
+      // Flame may call onLoad while a test or a caller explicitly requests
+      // the same initial location. The first load already satisfied it; do
+      // not leave _loadingLocation stuck or rebuild the world twice.
+      if (_pathfinding != null &&
+          location.id == locationId &&
+          spawnOverride == null &&
+          fromLocationId == null) {
+        return;
+      }
+    }
+
+    final loadCompleter = Completer<void>();
+    _activeLocationLoad = loadCompleter.future;
     _loadingLocation = true;
     _exitPending = false;
     try {
@@ -189,6 +211,10 @@ class GameWorld extends World {
       }
     } finally {
       _loadingLocation = false;
+      loadCompleter.complete();
+      if (identical(_activeLocationLoad, loadCompleter.future)) {
+        _activeLocationLoad = null;
+      }
     }
 
     // Камеру настраивает MuhtarGame после загрузки мира.
@@ -499,6 +525,12 @@ class GameWorld extends World {
     player.stop();
     gameState.progressQuests(locationId: exit.targetId);
     onLocationChange(exit);
+  }
+
+  void _onPlayerTileReached((int, int) tile) {
+    if (_loadingLocation) return;
+    final exit = location.exitAt(tile.$1, tile.$2);
+    if (exit != null) _useExit(exit);
   }
 
   String _enemySpawnKey(LocationDef location, EnemySpawn spawn) =>

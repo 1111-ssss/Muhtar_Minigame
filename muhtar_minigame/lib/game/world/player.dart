@@ -11,6 +11,7 @@ class Player extends MapEntity {
     String? label,
     super.skinId,
     super.skinProvider,
+    this.onTileReached,
   }) : super(
          color: const Color(0xFF42A5F5),
          label: label ?? 'Игрок',
@@ -27,6 +28,11 @@ class Player extends MapEntity {
 
   /// Скорость движения в тайлах в секунду.
   static const double tilesPerSecond = 4;
+
+  /// Called after the logical tile changes. The world uses this to consume
+  /// exits immediately, even though Flame updates the world controller before
+  /// its child components.
+  final void Function((int, int) tile)? onTileReached;
 
   bool _moving = false;
   bool get isMoving => _moving;
@@ -93,12 +99,16 @@ class Player extends MapEntity {
       // Плавное перемещение к центру следующего тайла.
       final speed = tilesPerSecond * IsometricMap.tileWidth * dt;
       final direction = targetWorld - position;
-      if (direction.length < speed) {
+      // At the exact frame boundary the player has reached the target too.
+      // Using <= keeps exit/interactions deterministic for a 250 ms test tick
+      // at the current four-tiles-per-second movement speed.
+      if (direction.length <= speed) {
         position = targetWorld;
         col = target.$1;
         row = target.$2;
         path.removeAt(0);
         if (path.isEmpty) _moving = false;
+        onTileReached?.call((col, row));
       } else {
         position += direction.normalized() * speed;
       }

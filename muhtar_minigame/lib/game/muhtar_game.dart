@@ -17,6 +17,7 @@ import '../game_logic/audio_service.dart';
 import '../game_logic/game_state.dart';
 import '../game_logic/location_transition.dart';
 import '../game_logic/notification_service.dart';
+import 'held_movement.dart';
 import 'world/enemy_entity.dart';
 import 'world/game_world.dart';
 import 'world/npc_entity.dart';
@@ -77,7 +78,9 @@ class MuhtarGame extends FlameGame
 
   final Set<LogicalKeyboardKey> _pressedKeys = {};
   final List<LogicalKeyboardKey> _movementKeyOrder = [];
-  double _heldMoveTimer = 0;
+  late final HeldMovement _heldMovement = HeldMovement(
+    onStep: (direction) => world_.movePlayerBy(direction.$1, direction.$2),
+  );
 
   /// Автосохранение: любое изменение состояния (взятие квеста, монеты, HP)
   /// уходит на диск не позже секунды спустя, чтобы закрытие окна не теряло
@@ -85,13 +88,6 @@ class MuhtarGame extends FlameGame
   async.Timer? _autosaveTimer;
   async.Timer? _tripTimer;
   static const _autosaveDelay = Duration(seconds: 1);
-
-  /// Интервал шагов при удержании клавиши. Первый шаг выполняется сразу в
-  /// [_beginMovementIntent], поэтому отдельной паузы перед повтором нет.
-  // Шаг длится примерно 0.14 секунды при текущей скорости игрока. Интервал
-  // короче этого времени успевает поставить следующий тайл в очередь до
-  // завершения текущего, поэтому удержание клавиши даёт непрерывную цепочку.
-  static const _heldMoveRepeat = 0.06;
 
   static const overlayHud = 'hud';
   static const overlayBattle = 'battle';
@@ -155,18 +151,7 @@ class MuhtarGame extends FlameGame
 
     if (_isInputBlocked) return;
     final direction = _directionFromPressedKeys();
-    if (direction == null) {
-      _heldMoveTimer = 0;
-      return;
-    }
-
-    // Первый шаг происходит на KeyDown. Удержание сразу переходит в обычный
-    // интервал повторения, без дополнительной задержки после первого шага.
-    _heldMoveTimer += dt;
-    if (_heldMoveTimer >= _heldMoveRepeat) {
-      _heldMoveTimer -= _heldMoveRepeat;
-      world_.movePlayerBy(direction.$1, direction.$2);
-    }
+    _heldMovement.update(dt, direction);
   }
 
   // --- Ввод: тапы по карте ---
@@ -390,8 +375,7 @@ class MuhtarGame extends FlameGame
   Future<void> _runLocationTransition(LocationExit exit) async {
     if (_changingLocation) return;
     _changingLocation = true;
-    _pressedKeys.clear();
-    _movementKeyOrder.clear();
+    _cancelMovementInput();
     unawaited(audio.play(GameSound.transition));
 
     final destination = Locations.byId(exit.targetId) ?? Locations.meadow;
@@ -466,8 +450,7 @@ class MuhtarGame extends FlameGame
     if (_endingBattle || battle != null || _pendingBattleEnemy != null) return;
     _pendingBattleEnemy = enemyEntity;
     world_.player.stop();
-    _pressedKeys.clear();
-    _movementKeyOrder.clear();
+    _cancelMovementInput();
     overlays.add(overlayBattleConfirm, priority: 10);
   }
 
@@ -522,25 +505,36 @@ class MuhtarGame extends FlameGame
         overlays.isActive(overlayPotatoPickup)) {
       return;
     }
-    if (prop.specialItemId == 'potato') {
-      openPotatoPickup(prop);
-      return;
-    }
-    if (prop.kind == LocationPropKind.bush &&
-        gameState.searchResult(prop.id)?.completed == true) {
+
+    // Любое взаимодействие с препятствием завершает удерживаемое движение.
+    // Иначе после пустого/завершённого поиска следующий повтор клавиши снова
+    // вызовет тот же callback и начнёт спамить уведомлениями.
+    world_.player.stop();
+    _cancelMovementInput();
+
+    final previousResult = gameState.searchResult(prop.id);
+    if (previousResult?.completed == true) {
       notifications.notify(
-        'В этом кусте больше ничего нет.',
+        _alreadySearchedMessage(prop),
         type: NotificationType.info,
       );
       return;
     }
+
+    if (prop.specialItemId == 'potato') {
+      openPotatoPickup(prop);
+      return;
+    }
     _searchingProp = prop;
-    world_.player.stop();
-    _pressedKeys.clear();
-    _movementKeyOrder.clear();
     registerWindowCloseHandler(overlaySearch, closeSearch);
     overlays.add(overlaySearch, priority: 10);
   }
+
+  String _alreadySearchedMessage(LocationProp prop) => switch (prop.kind) {
+    LocationPropKind.bush => 'В этом кусте больше ничего нет.',
+    LocationPropKind.trashBin => 'В этой мусорке больше ничего нет.',
+    _ => 'Здесь больше ничего нет.',
+  };
 
   LocationProp? get potatoPickupProp => _potatoPickupProp;
 
@@ -553,8 +547,7 @@ class MuhtarGame extends FlameGame
     }
     _potatoPickupProp = prop;
     world_.player.stop();
-    _pressedKeys.clear();
-    _movementKeyOrder.clear();
+    _cancelMovementInput();
     registerWindowCloseHandler(overlayPotatoPickup, closePotatoPickup);
     overlays.add(overlayPotatoPickup, priority: 30);
   }
@@ -583,6 +576,9 @@ class MuhtarGame extends FlameGame
   void _interactWithProp(LocationProp prop) {
     final questId = prop.interactionId;
     if (questId == null || _endingBattle || battle != null) return;
+
+    world_.player.stop();
+    _cancelMovementInput();
 
     final progress = gameState.quest(questId);
     if (progress?.state == QuestState.notStarted) {
@@ -623,8 +619,7 @@ class MuhtarGame extends FlameGame
   void openInsulinChoice() {
     if (overlays.isActive(overlayInsulinChoice)) return;
     world_.player.stop();
-    _pressedKeys.clear();
-    _movementKeyOrder.clear();
+    _cancelMovementInput();
     registerWindowCloseHandler(overlayInsulinChoice, closeInsulinChoice);
     overlays.add(overlayInsulinChoice, priority: 30);
   }
@@ -670,8 +665,7 @@ class MuhtarGame extends FlameGame
       return;
     }
     world_.player.stop();
-    _pressedKeys.clear();
-    _movementKeyOrder.clear();
+    _cancelMovementInput();
     unawaited(audio.playMusic(MusicTrack.puzzle));
     registerWindowCloseHandler(overlaySongMiniGame, closeSongMiniGame);
     overlays.add(overlaySongMiniGame, priority: 20);
@@ -705,8 +699,7 @@ class MuhtarGame extends FlameGame
     _donerQuestId = questId;
     _donerRecipeId = recipeId;
     world_.player.stop();
-    _pressedKeys.clear();
-    _movementKeyOrder.clear();
+    _cancelMovementInput();
     unawaited(audio.playMusic(MusicTrack.puzzle));
     registerWindowCloseHandler(overlayDonerAssembly, closeDonerAssembly);
     overlays.add(overlayDonerAssembly, priority: 20);
@@ -745,8 +738,7 @@ class MuhtarGame extends FlameGame
       return;
     }
     world_.player.stop();
-    _pressedKeys.clear();
-    _movementKeyOrder.clear();
+    _cancelMovementInput();
     unawaited(audio.pauseMusic());
     registerWindowCloseHandler(overlayVideoSequence, closeVideoSequence);
     overlays.add(overlayVideoSequence, priority: 30);
@@ -806,8 +798,7 @@ class MuhtarGame extends FlameGame
     );
 
     _battleEnemy = enemyEntity;
-    _pressedKeys.clear();
-    _movementKeyOrder.clear();
+    _cancelMovementInput();
 
     final playerFighter = Fighter(
       name: gameState.playerName,
@@ -938,8 +929,7 @@ class MuhtarGame extends FlameGame
     unawaited(saveProgress());
     battle = null;
     _battleEnemy = null;
-    _pressedKeys.clear();
-    _movementKeyOrder.clear();
+    _cancelMovementInput();
     overlays.remove(overlayBattle);
     notifications.notify(
       'Вы отступили из боя.',
@@ -951,8 +941,7 @@ class MuhtarGame extends FlameGame
 
   void _talkToNpc(NpcEntity npc) {
     _talkingNpc = npc;
-    _pressedKeys.clear();
-    _movementKeyOrder.clear();
+    _cancelMovementInput();
     overlays.remove(overlayBattle);
     overlays.add(overlayDialog, priority: 10);
   }
@@ -1010,8 +999,7 @@ class MuhtarGame extends FlameGame
 
   void openInventory() {
     world_.player.stop();
-    _pressedKeys.clear();
-    _movementKeyOrder.clear();
+    _cancelMovementInput();
     restoreLocationMusic();
     overlays.remove(overlayUpgrade);
     overlays.remove(overlayQuests);
@@ -1056,8 +1044,7 @@ class MuhtarGame extends FlameGame
     await world_.loadLocation('meadow', spawnOverride: Locations.meadow.spawn);
     camera.follow(world_.player, snap: true);
     unawaited(audio.playLocationMusic('meadow'));
-    _pressedKeys.clear();
-    _movementKeyOrder.clear();
+    _cancelMovementInput();
   }
 
   Future<void> _respawnAtMeadow() async {
@@ -1097,8 +1084,13 @@ class MuhtarGame extends FlameGame
       key == LogicalKeyboardKey.arrowRight;
 
   void _beginMovementIntent((int, int) direction) {
-    _heldMoveTimer = 0;
-    world_.movePlayerBy(direction.$1, direction.$2);
+    _heldMovement.begin(direction);
+  }
+
+  void _cancelMovementInput() {
+    _pressedKeys.clear();
+    _movementKeyOrder.clear();
+    _heldMovement.reset();
   }
 
   (int, int)? _directionFromPressedKeys() {

@@ -1,7 +1,10 @@
 import 'dart:math';
 
+import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:muhtar_minigame/domain/location.dart';
 import 'package:muhtar_minigame/domain/locations.dart';
 import 'package:muhtar_minigame/domain/quest.dart';
 import 'package:muhtar_minigame/game/muhtar_game.dart';
@@ -173,6 +176,66 @@ void main() {
 
     expect(game.overlays.isActive(MuhtarGame.overlaySearch), isFalse);
     expect(game.notifications.notifications.single.message, contains('ничего'));
+  });
+
+  test('повторный обыск мусорки показывает уведомление без окна поиска', () {
+    final prop = Locations.doner.props.firstWhere(
+      (candidate) => candidate.kind == LocationPropKind.trashBin,
+    );
+
+    for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
+      gameState.searchProp(prop.id);
+    }
+    game.world_.onPropSearch!(prop);
+
+    expect(game.overlays.isActive(MuhtarGame.overlaySearch), isFalse);
+    expect(
+      game.notifications.notifications.single.message,
+      contains('мусорке'),
+    );
+  });
+
+  testWidgets('удержание клавиши у пустого куста не повторяет уведомление', (
+    tester,
+  ) async {
+    gameState.currentLocationId = 'forest';
+    final prop = Locations.forest.props.firstWhere(
+      (candidate) => candidate.searchable && candidate.specialItemId == null,
+    );
+    for (var tap = 0; tap < SearchResult.requiredTaps; tap++) {
+      gameState.searchProp(prop.id);
+    }
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(GameWidget(game: FlameGame(world: game.world_)));
+      await game.world_.loadLocation('forest');
+    });
+    for (var frame = 0; frame < 3; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+
+    game.player
+      ..col = prop.col
+      ..row = prop.row + 1
+      ..syncPosition();
+    final key = KeyDownEvent(
+      logicalKey: LogicalKeyboardKey.keyW,
+      physicalKey: PhysicalKeyboardKey.keyW,
+      timeStamp: Duration.zero,
+    );
+    expect(
+      game.onKeyEvent(key, {LogicalKeyboardKey.keyW}),
+      KeyEventResult.handled,
+    );
+
+    // Первый шаг приводит к уже осмотренному кусту и показывает одно
+    // уведомление. Следующий повтор проходит через тот же update-цикл.
+    await tester.pump(const Duration(milliseconds: 16));
+    game.update(0.5);
+    await tester.pump(const Duration(milliseconds: 16));
+
+    expect(game.notifications.notifications, hasLength(1));
+    expect(game.overlays.isActive(MuhtarGame.overlaySearch), isFalse);
   });
 
   testWidgets('картошка в поиске имеет собственное представление', (
