@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run the game through the same Linux/GTK preflight as MuhtarBuild.
+# This avoids CMake reusing a GTK path from another Linux distribution.
+ROOT="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+export MUHTAR_BUILD_TARGET="lib/main.dart"
+exec "$ROOT/MuhtarBuild" "$@"

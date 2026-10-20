@@ -9,10 +9,10 @@ MuhtarBuild — редактор карт и PNG-портретов персон
   `muhtar_minigame/.flutter-version`);
 - Linux-пакеты Flutter desktop, `libmpv-dev`, `libepoxy-dev` или Docker.
 
-Для Fedora установите системные зависимости до первого `flutter run`:
+Для Fedora установите системные зависимости до первого запуска:
 
 ```bash
-sudo dnf install clang cmake ninja-build pkgconf-pkg-config gtk3-devel \
+sudo dnf install clang cmake ninja-build pkgconf-pkg-config gtk3-devel glib2-devel \
   mpv-devel libepoxy-devel alsa-lib-devel pulseaudio-libs-devel
 pkg-config --modversion mpv
 ```
@@ -30,6 +30,34 @@ pkg-config --modversion mpv
 make test                 # установит зависимости из локального кэша и запустит тесты
 make run                  # запустит игру на Linux desktop
 ```
+
+`make run` и `./RunGame` выполняют проверку GTK/GLib перед запуском и на Fedora
+не используют устаревший `PKG_CONFIG_PATH` от Debian/Ubuntu. Если CMake уже
+успел сохранить старый путь, обёртка удалит только кэш Flutter-сборки.
+
+Если запускался прямой `flutter run` и появилась ошибка про
+`/usr/lib/x86_64-linux-gnu/glib-2.0/include`, восстановите системные пакеты и
+запустите игру через обёртку:
+
+```bash
+sudo dnf reinstall pkgconf-pkg-config glib2-devel gtk3-devel
+cd muhtar_minigame
+flutter clean
+cd ..
+./RunGame
+```
+
+Перед повторным запуском на Fedora можно проверить, что `pkg-config` больше не
+возвращает Debian-путь:
+
+```bash
+pkg-config --variable=libdir glib-2.0
+pkg-config --cflags gtk+-3.0
+```
+
+Результат должен ссылаться на `/usr/lib64`, а не на
+`/usr/lib/x86_64-linux-gnu`. Если это не так, проверьте `PKG_CONFIG_PATH` и
+`PKG_CONFIG_LIBDIR` или выполните `unset PKG_CONFIG_PATH PKG_CONFIG_LIBDIR`.
 
 Для первой установки зависимостей с интернетом:
 

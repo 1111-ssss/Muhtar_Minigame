@@ -14,7 +14,7 @@ format:
 	dart format lib test tool
 
 run:
-	$(FLUTTER) run -d linux
+	FLUTTER_BIN="$(FLUTTER)" "$(CURDIR)/../RunGame"
 
 build:
 	$(FLUTTER) pub get --offline

@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 PROJECT="$ROOT/muhtar_minigame"
 FLUTTER="${FLUTTER_BIN:-flutter}"
+TARGET="${MUHTAR_BUILD_TARGET:-lib/muhtar_build.dart}"
 IS_FEDORA=0
 if [ -r /etc/os-release ]; then
   . /etc/os-release
@@ -102,4 +103,4 @@ if pkg-config --exists gtk+-3.0; then
 fi
 cd "$PROJECT"
 export MUHTAR_BUILD=1
-exec "$FLUTTER" run -d "${MUHTAR_BUILD_DEVICE:-linux}" -t lib/muhtar_build.dart "$@"
+exec "$FLUTTER" run -d "${MUHTAR_BUILD_DEVICE:-linux}" -t "$TARGET" "$@"
